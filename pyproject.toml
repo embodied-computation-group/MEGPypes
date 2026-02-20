@@ -1,0 +1,15 @@
+[project]
+name = "ecgpipes"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "meegkit>=0.1.9",
+    "mne>=1.10.2",
+    "nipype>=1.10.0",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
