@@ -8,6 +8,7 @@ dependencies = [
     "meegkit>=0.1.9",
     "mne>=1.10.2",
     "nipype>=1.10.0",
+    "pybids>=0.21.0",
     "pyyaml>=6.0.3",
 ]
 

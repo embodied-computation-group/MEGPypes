@@ -1,4 +1,13 @@
-# src/interfaces/preproc.py
+"""
+src/interfaces/preproc.py
+Creates the NiPype interface for initial raw preprocessing
+
+Heavily inspired by the work in the ephypype package that wraps MNE functionality in NiPype.
+(ref: https://github.com/neuropycon/ephypype/blob/master/ephypype/preproc.py)
+
+
+""" 
+
 from nipype.interfaces.base import (
     BaseInterface, BaseInterfaceInputSpec, TraitedSpec,
     File, traits, isdefined, OutputMultiPath
@@ -10,10 +19,14 @@ import os
 
 logger = logging.getLogger(__name__)
 
-
 class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
-    stim_channel = traits.Str(default="STI 014", desc="Stimulus channel")
+    stim_channel = traits.Either(
+        traits.Str(default="STI 014", desc="Stimulus channel as a string"),
+        traits.List(traits.Str(), desc="List of stimulus channels"),
+        None,
+        desc="Stimulus channel (string, list of strings, or None)"
+    )
     min_buffer = traits.Float(default=0.1, desc="Pre-event crop buffer (s)")
     max_buffer = traits.Float(default=0.1, desc="Post-event crop buffer (s)")
     l_freq = traits.Float(default=1.0, desc="Low-pass filter cutoff (Hz)")

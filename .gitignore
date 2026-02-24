@@ -1,8 +1,10 @@
-
+# standard cache files
+**/__pycache__/
 # folders
 /data/
 /.venv/
 /workdir
-
+/crashes
+/datatest
 # file patterns
 *.log
