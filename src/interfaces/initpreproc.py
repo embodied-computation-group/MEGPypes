@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
     stim_channel = traits.Either(
-        traits.Str(default="STI 014", desc="Stimulus channel as a string"),
+        traits.Str(desc="Stimulus channel as a string"),
         traits.List(traits.Str(), desc="List of stimulus channels"),
         None,
         desc="Stimulus channel (string, list of strings, or None)"
