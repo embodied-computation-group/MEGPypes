@@ -1,0 +1,23 @@
+
+paths:
+  basedir: "/Users/peli/Projects/Repositories/ECGPipes/data/ds006629"
+  workdir:  "workdir"
+  outputdir: "output"
+  subjects: [sub-01, sub-02] # list of subject to process
+
+workflow:
+  plugin: Linear # Linear or MultiProc
+  n_workers: 8 # can be int
+  auto_workers: True # Sets workers to max cpu cores - 2 cores
+
+processing:
+  crop:
+    stim_channel: "STI101"
+    min_buffer: -0.2
+    max_buffer: 0.5
+  filter:
+    l_freq: 1.0
+    h_freq: 40.0
+  gradcomp:
+    auto: true
+    order: 3

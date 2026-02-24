@@ -2,3 +2,7 @@
 # folders
 /data/
 /.venv/
+/workdir
+
+# file patterns
+*.log

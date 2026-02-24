@@ -4,9 +4,8 @@ from mne import find_events
 from meegkit.dss import dss_line_iter
 from mne.io import BaseRaw, RawArray
 # logging
-from nipype import logging
-
-logger = logging.getLogger("nipype.workflow")
+import logging
+logger = logging.getLogger(__name__)
 
 def crop_data(in_file, stim_channel, min_buffer, max_buffer):
     logger.info(f"Cropping file: {in_file}")
@@ -30,6 +29,7 @@ def crop_data(in_file, stim_channel, min_buffer, max_buffer):
     return out_file
 
 def filter_data(in_file, l_freq, h_freq):
+    import mne
     logger.info(f"Filtering file: {in_file}")
     logger.debug(f"Band-pass: {l_freq}-{h_freq} Hz")
 
@@ -45,6 +45,7 @@ def filter_data(in_file, l_freq, h_freq):
     return out_file
 
 def gradient_compensation(in_file, auto=True, order=3):
+    import mne
     logger.info(f"Applying gradient compensation to: {in_file}")
 
     raw = mne.io.read_raw_fif(in_file, preload=True)
