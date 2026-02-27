@@ -1,23 +1,37 @@
-
+# Paths configuration
 paths:
-  basedir: "data/ds006629"
-  workdir:  "workdir"
-  outputdir: "output"
-  subjects: [sub-01, sub-02] # list of subject to process
+  basedir: "data/ds006629"  # Base directory for raw data
+  workdir: "workdir"        # Directory for intermediate files
+  outputdir: "output"       # Directory for final outputs
+  subjects: [sub-01, sub-02]  # List of subjects to process
 
+# Workflow configuration
 workflow:
-  plugin: Linear # Linear or MultiProc
-  n_workers: 8 # can be int
-  auto_workers: True # Sets workers to max cpu cores - 2 cores
+  plugin: Linear             # Plugin for parallel processing: Linear or MultiProc
+  n_workers: 8              # Number of workers for parallel processing
+  auto_workers: True        # Automatically set workers to max CPU cores - 2
+
+# Processing configuration
+steps:
+  crop: true       # TODO: !NOT IMPLEMENTED!
+  filter: true     # TODO: !NOT IMPLEMENTED!
+  gradcomp: true   # TODO: !NOT IMPLEMENTED!
+  ica: true        # Enable/disable ICA
 
 processing:
   crop:
-    stim_channel: 
-    min_buffer: -0.2
-    max_buffer: 0.5
+    stim_channel:            # Channel to use for stimulus-based cropping
+    min_buffer: -0.2         # Minimum time buffer (seconds) before stimulus onset
+    max_buffer: 0.5          # Maximum time buffer (seconds) after stimulus offset
   filter:
-    l_freq: 1.0
-    h_freq: 40.0
+    l_freq: 1.0              # Low-frequency cutoff (Hz)
+    h_freq: 40.0             # High-frequency cutoff (Hz)
   gradcomp:
-    auto: true # Useful if data is from CTF system
-    order: 3
+    auto: true               # Automatically apply gradient compensation (useful for CTF systems)
+    order: 3                 # Order of gradient compensation
+  ica:
+    random_state: 821        # Random seed for reproducibility
+    n_components: 20         # Number of ICA components
+    l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
+    h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
+    method: fastica          # ICA method: fastica, infomax, etc.
