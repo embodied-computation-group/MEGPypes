@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
     # TODO: Write all input traits here
-
     
 class ArtifactRejectionOutputSpec(TraitedSpec):
-    
+
+
+class ArtifactRejection(BaseInterface):

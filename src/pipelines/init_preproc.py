@@ -13,9 +13,10 @@ def create_initial_preprocessing(
     crop_params: dict,
     filter_params: dict,
     gradcomp_params: dict,
+    ica_params: dict
 ):
     """
-    MEG preprocessing pipeline using classic Nipype iterables pattern.
+    MEG initial (basic) preprocessing pipeline using classic Nipype iterables pattern.
     
     Parallelization: infosource.iterables creates one workflow execution per subject.
     No MapNode needed—iterables handles subject-level iteration.
@@ -61,7 +62,12 @@ def create_initial_preprocessing(
         "h_freq": filter_params["h_freq"],
         "gradcomp_auto": gradcomp_params["auto"],
         "gradcomp_order": gradcomp_params["order"],
-        "out_file": "preproc_raw.fif",
+        "compute_ica": ica_params["compute"],
+        "ica_random_state": ica_params["random_state"],
+        "ica_n_components": ica_params["n_components"],
+        "ica_l_freq": ica_params["l_freq"],
+        "ica_h_freq": ica_params["h_freq"],
+        "ica_method": ica_params["method"]
     }
 
     # Use the helper function to set node inputs
@@ -84,7 +90,7 @@ def create_initial_preprocessing(
         (initial_preproc, datasink, [("out_file", "megpreproc.@final")]),
     ])
     
-    # Optional: log workflow structure (after creation, not during)
+    # Log workflow structure (after creation, not during)
     logger.info(f"Created workflow with {len(subject_list)} subjects")
     logger.debug(f"Subject list: {subject_list}")
     

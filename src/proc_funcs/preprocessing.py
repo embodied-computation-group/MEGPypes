@@ -1,6 +1,8 @@
 import numpy as np
+from pathlib import Path
 import mne
 from mne import find_events
+from mne.preprocessing import ICA
 from mne.io import BaseRaw, RawArray
 # logging
 import logging
@@ -93,3 +95,21 @@ def set_channels(in_file, ch_dict: dict):
     logger.info(f"Saved channel-modified file to {out_file}")
 
     return out_file
+
+def compute_ica(
+    raw: BaseRaw,
+    random_state: int,
+    n_components: int = 20,
+    filt_low: float = 1.0,
+    filt_high: float = 30.0,
+    method: str = "fastica",
+):
+    raw_copy = raw.copy().load_data()
+    raw_copy.filter(filt_low, filt_high)
+
+    ica = ICA(n_components=n_components, method=method, random_state=random_state)
+    ica.fit(raw_copy)
+    logger.info(f"Computed ica components file.")
+
+    # Return original raw
+    return ica

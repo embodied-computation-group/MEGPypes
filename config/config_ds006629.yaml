@@ -21,3 +21,12 @@ processing:
   gradcomp:
     auto: true # Useful if data is from CTF system
     order: 3
+  ica:
+    compute: True
+    random_state: 821
+    n_components: 20
+    l_freq: 1.0
+    h_freq: 30.0
+    method: fastica
+
+
