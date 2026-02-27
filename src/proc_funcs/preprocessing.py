@@ -8,11 +8,14 @@ from mne.io import BaseRaw, RawArray
 import logging
 logger = logging.getLogger(__name__)
 
-def crop_data(in_file, stim_channel, min_buffer, max_buffer):
-    logger.info(f"Cropping file: {in_file}")
+def crop_to_events(
+        raw: BaseRaw, 
+        stim_channel,
+        min_buffer: float, 
+        max_buffer: float
+    ):
+    logger.info(f"Cropping raw file to events.")
     logger.debug(f"Stim channel: {stim_channel}")
-
-    raw = mne.io.read_raw_fif(in_file, preload=True)
 
     # crop logic here
     events = find_events(raw, stim_channel=stim_channel, shortest_event=1)
@@ -21,13 +24,11 @@ def crop_data(in_file, stim_channel, min_buffer, max_buffer):
     tmax = raw.times[events[-1][0]] + max_buffer
     tmax = min(tmax, raw.times[-1])  # Ensure tmax <= data length
     cropped = raw.copy().crop(tmin=tmin, tmax=tmax)
+    logger.debug(f"Cropped to [{tmin:.2f}, {tmax:.2f}] s")
+    
+    logger.info(f"Cropped start and ends relative to events.")
 
-    out_file = "cropped_raw.fif"   # no path needed
-    cropped.save(out_file, overwrite=True)
-
-    logger.info(f"Saved cropped file to {out_file}")
-
-    return out_file
+    return cropped
 
 def filter_data(in_file, l_freq, h_freq):
     import mne
@@ -45,11 +46,9 @@ def filter_data(in_file, l_freq, h_freq):
 
     return out_file
 
-def gradient_compensation(in_file, auto=True, order=3):
-    import mne
-    logger.info(f"Applying gradient compensation to: {in_file}")
+def gradient_compensation(raw, auto=True, order=3):
+    logger.info(f"Applying gradient compensation")
 
-    raw = mne.io.read_raw_fif(in_file, preload=True)
     raw_copy = raw.copy()
 
     if auto:
@@ -64,12 +63,9 @@ def gradient_compensation(in_file, auto=True, order=3):
         logger.debug(f"Manual gradient compensation order: {order}")
         raw_copy.apply_gradient_compensation(order)
 
-    out_file = "gradcomp_raw.fif"
-    raw_copy.save(out_file, overwrite=True)
+    logger.info(f"Done: Gradient Compensation")
 
-    logger.info(f"Saved gradient compensated file to {out_file}")
-
-    return out_file
+    return raw
     
 def set_channels(in_file, ch_dict: dict):
     logger.info(f"Setting channel types for: {in_file}")

@@ -12,6 +12,12 @@ workflow:
   auto_workers: True        # Automatically set workers to max CPU cores - 2
 
 # Processing configuration
+steps:
+  crop: true       # TODO: !NOT IMPLEMENTED!
+  filter: true     # TODO: !NOT IMPLEMENTED!
+  gradcomp: true   # TODO: !NOT IMPLEMENTED!
+  ica: true        # Enable/disable ICA
+
 processing:
   crop:
     stim_channel:            # Channel to use for stimulus-based cropping
@@ -24,7 +30,6 @@ processing:
     auto: true               # Automatically apply gradient compensation (useful for CTF systems)
     order: 3                 # Order of gradient compensation
   ica:
-    compute: True            # Whether to compute ICA
     random_state: 821        # Random seed for reproducibility
     n_components: 20         # Number of ICA components
     l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)

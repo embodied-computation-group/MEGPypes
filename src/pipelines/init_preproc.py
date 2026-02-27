@@ -10,6 +10,7 @@ def create_initial_preprocessing(
     workdir: str,
     output_dir: str,
     subject_list: list[str],
+    stepflags_params: dict,
     crop_params: dict,
     filter_params: dict,
     gradcomp_params: dict,
@@ -55,6 +56,7 @@ def create_initial_preprocessing(
     
     # Define parameters as a dictionary
     params = {
+        "compute_ica": stepflags_params["ica"],
         "stim_channel": crop_params["stim_channel"],
         "min_buffer": crop_params["min_buffer"],
         "max_buffer": crop_params["max_buffer"],
@@ -62,7 +64,6 @@ def create_initial_preprocessing(
         "h_freq": filter_params["h_freq"],
         "gradcomp_auto": gradcomp_params["auto"],
         "gradcomp_order": gradcomp_params["order"],
-        "compute_ica": ica_params["compute"],
         "ica_random_state": ica_params["random_state"],
         "ica_n_components": ica_params["n_components"],
         "ica_l_freq": ica_params["l_freq"],

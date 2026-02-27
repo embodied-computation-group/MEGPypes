@@ -16,12 +16,14 @@ import mne
 from mne import find_events
 import logging
 import os
-from src.proc_funcs.preprocessing import compute_ica
+from src.proc_funcs.preprocessing import crop_to_events, gradient_compensation, compute_ica
 
 logger = logging.getLogger(__name__)
 
 class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
+    # Enable steps on/off
+    enable_ica = traits.Bool(True, usedefault=True, desc="Flag to enable compute ica components file.")
     # 1. Crop
     stim_channel = traits.Either(
         traits.Str(),
@@ -37,9 +39,7 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     # 3. Gradient compensation
     gradcomp_auto = traits.Bool(True, usedefault=True, desc="Auto gradient compensation")
     gradcomp_order = traits.Int(3, usedefault=True, desc="Manual gradient compensation order")
-    # 4. Compute ica
-    compute_ica = traits.Bool(True, usedefault=True, desc="Flag to compute ica components file.")
-    ## ICA configuration
+    # 4. Compute ica components
     ica_random_state = traits.Int(mandatory=True, desc="Random seed for ICA reproducibility")
     ica_n_components = traits.Int(20, usedefault=True, desc="Number of ICA components to compute")
     ica_l_freq = traits.Float(1.0, usedefault=True, desc="High-pass frequency for ICA fitting (Hz)")
@@ -74,32 +74,28 @@ class InitialPreproc(BaseInterface):
         raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
         
         # 1. Crop around events
-        events = find_events(raw, stim_channel=self.inputs.stim_channel, shortest_event=1)
-        tmin = max(0.0, raw.times[events[0][0]] + self.inputs.min_buffer)
-        tmax = min(raw.times[-1], raw.times[events[-1][0]] + self.inputs.max_buffer)
-        raw = raw.copy().crop(tmin=tmin, tmax=tmax)
-        logger.debug(f"Cropped to [{tmin:.2f}, {tmax:.2f}] s")
+        raw = crop_to_events(
+            raw=raw,
+            stim_channel=self.inputs.stim_channel,
+            min_buffer=self.inputs.min_buffer,
+            max_buffer=self.inputs.max_buffer
+        )
         
         # 2. Filter
         raw.filter(self.inputs.l_freq, self.inputs.h_freq)
         logger.debug(f"Filtered {self.inputs.l_freq}-{self.inputs.h_freq} Hz")
         
         # 3. Gradient compensation
-        if self.inputs.gradcomp_auto:
-            comps = raw.info.get("comps", [])
-            if comps:
-                k = max(range(len(comps)))
-                raw.apply_gradient_compensation(k)
-                logger.debug(f"Auto gradcomp order: {k}")
-            else:
-                logger.warning("No gradcomp matrices available")
-        else:
-            raw.apply_gradient_compensation(self.inputs.gradcomp_order)
-            logger.debug(f"Manual gradcomp order: {self.inputs.gradcomp_order}")
+        raw = gradient_compensation(
+            raw=raw,
+            auto=self.inputs.gradcomp_auto,
+            order=self.inputs.gradcomp_order
+        )
         
         # 4. Compute ICA
-        if self.inputs.compute_ica:
+        if self.inputs.enable_ica:
             logger.info(f"ICA FILE NAME: {self.inputs.ica_file}")
+            # compute ica components
             ica_comps = compute_ica(
                 raw=raw,
                 random_state=self.inputs.ica_random_state,
@@ -108,7 +104,7 @@ class InitialPreproc(BaseInterface):
                 filt_high=self.inputs.ica_h_freq,
                 method=self.inputs.ica_method
             )
-
+            # save ica
             ica_path = os.path.abspath(self.inputs.ica_file)
             ica_comps.save(ica_path, overwrite=True)
             logger.info(f"Saved ICA: {ica_path}")
