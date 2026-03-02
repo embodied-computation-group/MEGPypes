@@ -1,7 +1,7 @@
 from pathlib import Path
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink
-from src.interfaces.initpreproc import InitialPreproc
-from src.utils import set_node_inputs
+from megpypes.interfaces.initpreproc import InitialPreproc
+from megpypes.utils import set_node_inputs
 import logging
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,7 @@ def create_initial_preprocessing(
     stepflags_params: dict,
     crop_params: dict,
     filter_params: dict,
-    gradcomp_params: dict,
-    ica_params: dict
+    gradcomp_params: dict
 ):
     """
     MEG initial (basic) preprocessing pipeline using classic Nipype iterables pattern.
@@ -56,19 +55,13 @@ def create_initial_preprocessing(
     
     # Define all function parameters as a dictionary
     params = {
-        "compute_ica": stepflags_params["ica"],
         "stim_channel": crop_params["stim_channel"],
         "min_buffer": crop_params["min_buffer"],
         "max_buffer": crop_params["max_buffer"],
         "l_freq": filter_params["l_freq"],
         "h_freq": filter_params["h_freq"],
         "gradcomp_auto": gradcomp_params["auto"],
-        "gradcomp_order": gradcomp_params["order"],
-        "ica_random_state": ica_params["random_state"],
-        "ica_n_components": ica_params["n_components"],
-        "ica_l_freq": ica_params["l_freq"],
-        "ica_h_freq": ica_params["h_freq"],
-        "ica_method": ica_params["method"]
+        "gradcomp_order": gradcomp_params["order"]
     }
 
     # Use the helper function to set node inputs

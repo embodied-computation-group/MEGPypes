@@ -1,5 +1,6 @@
 # standard cache files
 **/__pycache__/
+*.egg-info/
 # folders
 /data/
 /.venv/

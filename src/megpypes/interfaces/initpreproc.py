@@ -16,7 +16,7 @@ import mne
 from mne import find_events
 import logging
 import os
-from src.proc_funcs.preprocessing import crop_to_events, gradient_compensation, compute_ica
+from megpypes.proc_funcs.preprocessing import crop_to_events, gradient_compensation
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,6 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
 
 class InitialPreprocOutputSpec(TraitedSpec):
     out_file = File(exists=True, desc="Preprocessed MEG file")
-    
     events_file = File(exists=False, desc="Events TSV (optional)")
 
 
@@ -100,5 +99,4 @@ class InitialPreproc(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs["out_file"] = os.path.abspath(self.inputs.out_file)
-        outputs["ica_file"] = os.path.abspath(self.inputs.ica_file)
         return outputs

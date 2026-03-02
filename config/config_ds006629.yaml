@@ -12,7 +12,7 @@ workflow:
   auto_workers: True        # Automatically set workers to max CPU cores - 2
 
 # Processing configuration
-preproc:
+init_preproc:
   steps:
     crop: true       # TODO: !NOT IMPLEMENTED!
     filter: true     # TODO: !NOT IMPLEMENTED!

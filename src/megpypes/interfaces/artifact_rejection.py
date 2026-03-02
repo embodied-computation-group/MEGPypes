@@ -6,7 +6,7 @@ import mne
 from mne import find_events
 import logging
 import os
-from src.proc_funcs.artifacts import apply_zapline_denoising
+from megpypes.proc_funcs.artifacts import apply_zapline_denoising
 
 logger = logging.getLogger(__name__)
 
