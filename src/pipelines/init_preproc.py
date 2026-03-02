@@ -54,7 +54,7 @@ def create_initial_preprocessing(
         name='initial_preproc'
     )
     
-    # Define parameters as a dictionary
+    # Define all function parameters as a dictionary
     params = {
         "compute_ica": stepflags_params["ica"],
         "stim_channel": crop_params["stim_channel"],

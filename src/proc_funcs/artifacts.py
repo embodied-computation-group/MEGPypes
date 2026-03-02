@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def apply_zapline_denoising(
-    in_file,
+    raw,
     fline=50.0,
     n_chunks=10,
     spot_sz=7,
@@ -18,7 +18,6 @@ def apply_zapline_denoising(
     logger.info(f"Running apply_zapline_denoising")
     logger.debug(f"fline={fline}, n_chunks={n_chunks}")
 
-    raw = mne.io.read_raw_fif(in_file, preload=True)
     raw_copy = raw.copy().load_data()
 
     raw_data = raw_copy.get_data()
@@ -73,6 +72,6 @@ def apply_zapline_denoising(
 
     out_file = "zapline_raw.fif"
 
-    logger.info(f"Created new ZAPLINED raw file.")
+    logger.info(f"ZAPLINED raw file.")
 
     return new_raw
