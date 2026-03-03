@@ -12,6 +12,7 @@ This interface:
 The user can also provide a pre-computed ICA decomposition and/or manually specify which ICA components indices to exclude instead of relying on automatic ICLabel classification.
 
 """
+import os
 import mne
 from mne_icalabel import label_components
 from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, TraitedSpec, traits
@@ -57,7 +58,7 @@ class AutoICA(BaseInterface):
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
 
-        logger.info(f"NODE: Apply ICA | Raw File: {self.inputs.raw_file} | ICA File: {self.inputs.ica_file}")
+        logger.info(f"NODE: AutoICA | Raw File: {self.inputs.raw_file} | ICA File: {self.inputs.ica_file}")
 
         # assert if ic_labels are valid
         if self.inputs.ic_labels_exclude:
@@ -104,10 +105,14 @@ class AutoICA(BaseInterface):
             threshold = 0.7
     
             # Get the indices of ICA coomponents to exclude based on user defined class labels and probability threshold
-            ica_exclude_idx = [
-                idx for idx, label in enumerate(zip(labels, probs))
-                if label[0] in self.inputs.ic_labels_exclude and label[1] > threshold
+            ica_exclude = [
+                (idx, label) for idx, label in enumerate(zip(labels, probs))
+                if label[0] in self.inputs.ic_labels_exclude and label[1] > self.inputs.ic_label_threshold
             ]
+            ica_exclude_labels = [label for idx, label in ica_exclude]
+            ica_exclude_idx = [idx for idx, label in ica_exclude]
+            logger.info(f"Excluding ICA components with labels: {ica_exclude_labels}")
+            logger.info(f"and with indices: {ica_exclude_idx}")
             # TODO: Log the rejected indices of component labelos that were below threshold for later QC
         
         # 3. Apply ICA cleaning
