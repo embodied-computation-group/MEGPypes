@@ -26,7 +26,7 @@ init_preproc:
       max_buffer: 0.5          # Maximum time buffer (seconds) after stimulus offset
     filter:
       l_freq: 1.0              # Low-frequency cutoff (Hz)
-      h_freq: 40.0             # High-frequency cutoff (Hz)
+      h_freq: 100             # High-frequency cutoff (Hz)
     gradcomp:
       auto: true               # Automatically apply gradient compensation (useful for CTF systems)
       order: 3                 # Order of gradient compensation
@@ -46,9 +46,18 @@ artifact_rejection:
       n_iter_max: 30             # Maximum number of iterations for Zapline
       mag_only: true             # Process only magnetometer channels with Zapline
 
-    ica:
-    random_state: 821        # Random seed for reproducibility
-    n_components: 20         # Number of ICA components
-    l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
-    h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
-    method: fastica          # ICA method: fastica, infomax, etc.
+auto_ica:
+  steps:
+
+  args:
+    compute_ica:
+      random_state: 821        # Random seed for reproducibility
+      n_components: 20         # Number of ICA components
+      l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
+      h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
+      method: fastica          # ICA method: fastica, infomax, etc.
+
+    ic_labels:
+      ica_exclude: []
+      ic_labels_exclude: ["eye blink", "muscle artifact", "heart beat"]  # ICLabel class labels to exclude
+      ic_label_threshold: 0.7  # Probability threshold for excluding components based on ICLabel classification

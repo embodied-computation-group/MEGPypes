@@ -43,7 +43,6 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
 
     # Output
     out_file = traits.Str("initial_preproc_raw.fif", usedefault=True, desc="Output filename")
-    ica_file = traits.Str("initial_preproc_ica.fif", usedefault=True, desc="ICA output filename")
 
 class InitialPreprocOutputSpec(TraitedSpec):
     out_file = File(exists=True, desc="Preprocessed MEG file")
