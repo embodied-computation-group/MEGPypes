@@ -1,5 +1,6 @@
 from pathlib import Path
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
+from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
 from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
@@ -31,6 +32,13 @@ def create_meg_preprocessing(
     # Create workflow
     wf = Workflow(name="megpreproc")
     wf.base_dir = workdir
+
+
+    runs = RunFinder(root=basedir).find_runs(subject_list=subject_list, task_list="MMNHCS")
+    
+    subject_list = [r.subject for r in runs] #override subject list
+    file_list = [r.path for r in runs]
+    print(f"Discovered runs: {len(runs)} | Subjects: {subject_list} | Files: {file_list}")
     
     # === SUBJECT ITERATION (classic Nipype pattern) ===
     infosource = Node(
