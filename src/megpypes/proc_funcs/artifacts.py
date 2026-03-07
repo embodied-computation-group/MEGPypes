@@ -2,6 +2,7 @@ import numpy as np
 from meegkit.dss import dss_line_iter
 import mne
 from mne.io import BaseRaw, RawArray
+from scipy.signal import welch
 import logging
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,8 @@ def apply_zapline_denoising(
     win_sz=12,
     nfft=2048,
     n_iter_max=30,
-    mag_only=True
+    mag_only=True,
+    detect_line_freq=True
 ):
     logger.info(f"Running apply_zapline_denoising")
     logger.debug(f"fline={fline}, n_chunks={n_chunks}")
@@ -36,6 +38,39 @@ def apply_zapline_denoising(
         mag_ix = np.arange(raw_data.shape[0])
         data_to_denoise = raw_data
 
+    # Detect line frequency if enabled, otherwise use provided fline
+    if detect_line_freq:
+        sfreq = raw.info["sfreq"]
+
+        freqs, psd = welch(
+            data_to_denoise,
+            fs=sfreq,
+            axis=1,
+            nperseg=int(sfreq * 4),
+            nfft=nfft
+        )
+
+        mean_power = psd.mean(axis=0)
+
+        mask = (freqs >= 48) & (freqs <= 62)
+
+        # Power Check
+        peak_power = mean_power[mask].max()
+        median_power = np.median(mean_power[mask])
+        if peak_power < 3 * median_power: # Threshold 3 is not empirically derived
+            logger.warning(f"No clear line frequency peak detected. Peak power: {peak:.2f}, Median power: {median_power:.2f}. Defaulting to fline={fline} Hz.")
+            line_freq = None
+        else:
+            line_freq = freqs[mask][np.argmax(mean_power[mask])]
+            line_freq = np.round(line_freq, 2) # round to fit DSS input
+            logger.info(f"Detected line frequency peak: {line_freq} Hz")
+    else:
+        line_freq = fline
+
+    if line_freq is None:
+        logger.warning("No sufficient line frequency detected. Skipping Zapline denoising to avoid DSS non-convergence.")
+        return raw_copy
+
     sfreq = info["sfreq"]
 
     chunks = np.array_split(data_to_denoise, n_chunks, axis=1)
@@ -48,7 +83,7 @@ def apply_zapline_denoising(
 
         cleaned_T, _ = dss_line_iter(
             chunk_T,
-            fline=fline,
+            fline=line_freq,
             sfreq=sfreq,
             spot_sz=spot_sz,
             win_sz=win_sz,

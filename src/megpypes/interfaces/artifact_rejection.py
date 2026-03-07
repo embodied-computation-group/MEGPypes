@@ -24,8 +24,9 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
     spot_sz = traits.Int(7, usedefault=True, desc="Spot size for DSS line removal")
     win_sz = traits.Int(12, usedefault=True, desc="Window size for DSS line removal")
     nfft = traits.Int(2048, usedefault=True, desc="Number of FFT points for DSS")
-    n_iter_max = traits.Int(30, usedefault=True, desc="Maximum number of iterations for DSS")
+    n_iter_max = traits.Int(100, usedefault=True, desc="Maximum number of iterations for DSS")
     mag_only = traits.Bool(True, usedefault=True, desc="Process only magnetometer channels")
+    detect_line_freq = traits.Bool(True, usedefault=True, desc="Automatically detect line frequency from data (overrides fline if True)")
 
     # Output
     out_file = traits.Str("artifact_cleaned_raw.fif", usedefault=True, desc="Output filename")
@@ -60,7 +61,8 @@ class ArtifactRejection(BaseInterface):
                 win_sz=self.inputs.win_sz,
                 nfft=self.inputs.nfft,
                 n_iter_max=self.inputs.n_iter_max,
-                mag_only=self.inputs.mag_only
+                mag_only=self.inputs.mag_only,
+                detect_line_freq=self.inputs.detect_line_freq
             )
 
         # Save output file

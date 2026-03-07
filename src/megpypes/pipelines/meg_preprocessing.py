@@ -60,8 +60,8 @@ def create_meg_preprocessing(
     apply_interface_config(ica, pipeline_config["auto_ica"])
 
     # === Epoching ====
-    epoching = Node(Epoching(), name="epoching")
-    apply_interface_config(epoching, pipeline_config["epoching"])
+    #epoching = Node(Epoching(), name="epoching")
+    #apply_interface_config(epoching, pipeline_config["epoching"])
     
     # === OUTPUT ===
     datasink = Node(
@@ -77,7 +77,9 @@ def create_meg_preprocessing(
     wf.connect([
         (infosource, selectraw, [("subject_id", "subject_id")]),
         (selectraw, initial_preproc, [("meg", "in_file")]),
-        (initial_preproc, datasink, [("out_file", "megpreproc.@final")]),
+        (initial_preproc, artifact_rejection, [("out_file", "in_file")]),
+        (artifact_rejection, ica, [("out_file", "in_file")]),
+        (ica, datasink, [("out_file", "megpreproc.@final")]),
     ])
     
     # Log workflow structure (after creation, not during)

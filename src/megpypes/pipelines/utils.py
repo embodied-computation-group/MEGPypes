@@ -51,6 +51,7 @@ def apply_interface_config(node, config: dict):
         step_args = args.get(step, {})
 
         for k, v in step_args.items():
+            print(f"Step '{step}' argument '{k}': {v}")
             if k in valid_inputs:
                 params[k] = v
             else:

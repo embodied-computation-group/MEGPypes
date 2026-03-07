@@ -24,8 +24,7 @@ from megpypes.proc_funcs.preprocessing import compute_ica
 logger = logging.getLogger(__name__)
 
 class AutoICAInputSpec(BaseInterfaceInputSpec):
-    raw_file = traits.File(exists=True, mandatory=True, desc="Path to the raw FIF file to process")
-    ica_file = traits.File(exists=True, mandatory=False, desc="Path to the ICA decomposition file (FIF)")
+    in_file = traits.File(exists=True, mandatory=True, desc="Path to the raw FIF file to process")
 
     # 1. Compute ICA components (if not already computed)
     ica_random_state = traits.Int(mandatory=True, desc="Random seed for ICA reproducibility")
@@ -41,7 +40,7 @@ class AutoICAInputSpec(BaseInterfaceInputSpec):
 
     # Output
     out_file = traits.File(desc="Path to save the ICA-applied raw FIF file")
-    ica_file = traits.Str("initial_preproc_ica.fif", usedefault=True, desc="ICA output filename")
+    ica_file = traits.Str("auto_ica-icasolution.fif", usedefault=True, desc="ICA output filename")
 
 class AutoICAOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="ICA-applied raw FIF file")
@@ -58,7 +57,7 @@ class AutoICA(BaseInterface):
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
 
-        logger.info(f"NODE: AutoICA | Raw File: {self.inputs.raw_file} | ICA File: {self.inputs.ica_file}")
+        logger.info(f"NODE: AutoICA | Raw File: {self.inputs.in_file} | ICA File: {self.inputs.ica_file}")
 
         # assert if ic_labels are valid
         if self.inputs.ic_labels_exclude:
@@ -68,7 +67,7 @@ class AutoICA(BaseInterface):
                     raise ValueError(f"Invalid ICLabel class label: '{label}'. Valid options are: {valid_labels}")
 
         # load Raw
-        raw = mne.io.read_raw_fif(self.inputs.raw_file, preload=True)
+        raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
 
         # apply a common average refercing to comply with ICLabel
         raw.set_eeg_reference('average')
