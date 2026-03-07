@@ -12,52 +12,62 @@ workflow:
   auto_workers: True        # Automatically set workers to max CPU cores - 2
 
 # Processing configuration
-init_preproc:
-  steps:
-    crop: true       # TODO: !NOT IMPLEMENTED!
-    filter: true     # TODO: !NOT IMPLEMENTED!
-    gradcomp: true   # TODO: !NOT IMPLEMENTED!
-    ica: true        # Enable/disable ICA
+pipeline_config:
+  initial_preproc:
+    steps:
+      crop: true       # TODO: !NOT IMPLEMENTED!
+      filter: true     # TODO: !NOT IMPLEMENTED!
+      gradcomp: true   # TODO: !NOT IMPLEMENTED!
+      ica: true        # TODO: !NOT IMPLEMENTED!
 
-  args:
-    crop:
-      stim_channel:            # Channel to use for stimulus-based cropping
-      min_buffer: -0.2         # Minimum time buffer (seconds) before stimulus onset
-      max_buffer: 0.5          # Maximum time buffer (seconds) after stimulus offset
-    filter:
-      l_freq: 1.0              # Low-frequency cutoff (Hz)
-      h_freq: 100             # High-frequency cutoff (Hz)
-    gradcomp:
-      auto: true               # Automatically apply gradient compensation (useful for CTF systems)
-      order: 3                 # Order of gradient compensation
+    args:
+      crop:
+        stim_channel:            # Channel to use for stimulus-based cropping
+        min_buffer: -0.2         # Minimum time buffer (seconds) before stimulus onset
+        max_buffer: 0.5          # Maximum time buffer (seconds) after stimulus offset
+      filter:
+        l_freq: 1.0              # Low-frequency cutoff (Hz)
+        h_freq: 100             # High-frequency cutoff (Hz)
+      gradcomp:
+        auto: true               # Automatically apply gradient compensation (useful for CTF systems)
+        order: 3                 # Order of gradient compensation
 
-artifact_rejection:
-  steps:
-    zapline: true     # Enable/disable Zapline for line noise removal
-    compute_ica: true  # Enable/disable computation of ICA decomposition solution
+  artifact_rejection:
+    steps:
+      zapline: true     # Enable/disable Zapline for line noise removal
+      compute_ica: true  # Enable/disable computation of ICA decomposition solution
 
-  args:
-    zapline:          # Denoising Source Separation (DSS) parameters
-      fline: 50.0              # Line frequency (Hz)
-      n_chunks: 10              # Number of chunks to split data for Zapline
-      spot_sz: 7             # Size of the "spot" for Zapline (number of neighboring frequencies to consider)
-      win_sz: 12             # Window size for Zapline (number of samples)
-      nfft: 2048              # Number of FFT points for Zapline
-      n_iter_max: 30             # Maximum number of iterations for Zapline
-      mag_only: true             # Process only magnetometer channels with Zapline
+    args:
+      zapline:          # Denoising Source Separation (DSS) parameters
+        fline: 50.0              # Line frequency (Hz)
+        n_chunks: 10              # Number of chunks to split data for Zapline
+        spot_sz: 7             # Size of the "spot" for Zapline (number of neighboring frequencies to consider)
+        win_sz: 12             # Window size for Zapline (number of samples)
+        nfft: 2048              # Number of FFT points for Zapline
+        n_iter_max: 30             # Maximum number of iterations for Zapline
+        mag_only: true             # Process only magnetometer channels with Zapline
 
-auto_ica:
-  steps:
+  auto_ica:
+    steps:
 
-  args:
-    compute_ica:
-      random_state: 821        # Random seed for reproducibility
-      n_components: 20         # Number of ICA components
-      l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
-      h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
-      method: fastica          # ICA method: fastica, infomax, etc.
+    args:
+      compute_ica:
+        random_state: 821        # Random seed for reproducibility
+        n_components: 20         # Number of ICA components
+        l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
+        h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
+        method: fastica          # ICA method: fastica, infomax, etc.
 
-    ic_labels:
-      ica_exclude: []
-      ic_labels_exclude: ["eye blink", "muscle artifact", "heart beat"]  # ICLabel class labels to exclude
-      ic_label_threshold: 0.7  # Probability threshold for excluding components based on ICLabel classification
+      ic_labels:
+        ica_exclude: []
+        ic_labels_exclude: ["eye blink", "muscle artifact", "heart beat"]  # ICLabel class labels to exclude
+        ic_label_threshold: 0.7  # Probability threshold for excluding components based on ICLabel classification
+  
+  epoching:
+    steps:
+      epoch: true       # TODO: !NOT IMPLEMENTED!
+
+    args:
+      epoch:
+        
+      autoreject:
