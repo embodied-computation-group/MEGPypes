@@ -26,12 +26,19 @@ logger = logging.getLogger(__name__)
 class AutoICAInputSpec(BaseInterfaceInputSpec):
     in_file = traits.File(exists=True, mandatory=True, desc="Path to the raw FIF file to process")
 
+    # enable steps on/off
+    compute_ica = traits.Bool(True, usedefault=True, desc="Flag to compute ICA decomposition (if False, must provide pre-computed ICA file)")
+    ic_labels = traits.Bool(True, usedefault=True, desc="Flag to enable ICLabel classification of ICA components for automatic exclusion")
+
     # 1. Compute ICA components (if not already computed)
     ica_random_state = traits.Int(mandatory=True, desc="Random seed for ICA reproducibility")
     ica_n_components = traits.Int(20, usedefault=True, desc="Number of ICA components to compute")
     ica_l_freq = traits.Float(1.0, usedefault=True, desc="High-pass frequency for ICA fitting (Hz)")
     ica_h_freq = traits.Float(30.0, usedefault=True, desc="Low-pass frequency for ICA fitting (Hz)")
     ica_method = traits.Enum("fastica","picard","infomax",usedefault=True,desc="ICA algorithm to use")
+    # Optional: Provide pre-computed ICA solution instead of computing from raw data
+    # TODO: ica_in_file = traits.File(None, usedefault=True, exists=False, mandatory=False, desc="Optional path to pre-computed ICA solution (FIF file). If not provided, ICA will be computed from the raw data.")
+    # this is not working so i just stop using it for now and just rely on the default behavior
 
     # 2. ICLabel classification and exclusion
     ica_exclude = traits.List(traits.Int(), usedefault=True, mandatory=False, desc="List of ICA component indices to exclude (e.g., [0, 1, 2])")
@@ -73,12 +80,15 @@ class AutoICA(BaseInterface):
         raw.set_eeg_reference('average')
         
         # 1. compute ICA
-        if self.inputs.ica_file:
+        if not self.inputs.compute_ica:
+            # check if ICA file exists
+            if not self.inputs.precomputed_ica_file:
+                raise ValueError("compute_ica is set to False but no precomputed ICA file provided.")
             logger.info(f"Loading existing ICA decomposition from: {self.inputs.ica_file}")
             ica = mne.preprocessing.read_ica(self.inputs.ica_file)
         else:
             logger.info("No ICA file provided. Computing ICA decomposition from raw data.")
-            ica = compute_ica(
+            ica_comps = compute_ica(
                 raw=raw,
                 random_state=self.inputs.ica_random_state,
                 n_components=self.inputs.ica_n_components,
@@ -95,9 +105,13 @@ class AutoICA(BaseInterface):
         if self.inputs.ica_exclude:
             ica_exclude_idx = self.inputs.ica_exclude
         else:
-            # ICLabel Automatic ICA Eexclusion
+            # check if data is EEG, ICLabel is designed for EEG data
+            if not any(ch_type in ['eeg'] for ch_type in raw.get_channel_types()):
+                logger.warning("Data does not contain EEG channels. ICLabel classification may not be accurate.")
+            
+            # ICLabel Automatic ICA Exclusion
             logger.info("No hardcoded ICA components to exclude. Automatic ICLabel classification of exclusion.")
-            ic_labels = label_components(raw, ica, method="iclabel") # extracts automatic ICA component labels with probabilities
+            ic_labels = label_components(raw, ica_comps, method="iclabel") # extracts automatic ICA component labels with probabilities
             labels = ic_labels["labels"]
             probs = ic_labels["probs"]
             # Define a threshold for exclusion

@@ -65,7 +65,7 @@ class InitialPreproc(BaseInterface):
         logger.info(f"WF: Initial Preproc | In-File: {self.inputs.in_file}")
         
         # Load data
-        raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
+        raw = read_raw_auto(self.inputs.in_file)
         
         # 1. Crop around events
         raw = crop_to_events(
@@ -99,3 +99,21 @@ class InitialPreproc(BaseInterface):
         outputs = self._outputs().get()
         outputs["out_file"] = os.path.abspath(self.inputs.out_file)
         return outputs
+    
+def read_raw_auto(in_file_path):
+
+    if in_file_path.endswith('.fif'):
+        raw = mne.io.read_raw_fif(in_file_path, preload=True)
+    elif in_file_path.endswith('.meg4'):
+        # look up until .ds is found then input dir
+        dir_path = os.path.dirname(in_file_path)
+        while dir_path and not dir_path.endswith('.ds'):
+            dir_path = os.path.dirname(dir_path)
+        if not dir_path:
+            raise ValueError(f"Could not find .ds directory for file: {in_file_path}")
+        raw = mne.io.read_raw_ctf(dir_path, preload=True)
+    else:
+        # try to auto-detect based on file content
+        raw = mne.io.read_raw(in_file_path, preload=True)
+
+    return raw

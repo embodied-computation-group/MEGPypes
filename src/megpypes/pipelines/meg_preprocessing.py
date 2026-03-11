@@ -1,4 +1,8 @@
 from pathlib import Path
+import string
+
+from msgspec import field
+from parse import compile as parse_compile
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
 from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
@@ -13,7 +17,9 @@ def create_meg_preprocessing(
     basedir: str,
     workdir: str,
     output_dir: str,
-    subject_list: list[str],
+    file_templates: str,
+    iterable_fields: list[str],
+    iterable_values: dict[str, list[str]],
     pipeline_config: dict
 ):
     """
@@ -33,26 +39,40 @@ def create_meg_preprocessing(
     wf = Workflow(name="megpreproc")
     wf.base_dir = workdir
 
-
-    runs = RunFinder(root=basedir).find_runs(subject_list=subject_list, task_list="MMNHCS")
-    
-    subject_list = [r.subject for r in runs] #override subject list
-    file_list = [r.path for r in runs]
-    print(f"Discovered runs: {len(runs)} | Subjects: {subject_list} | Files: {file_list}")
-    
-    # === SUBJECT ITERATION (classic Nipype pattern) ===
     infosource = Node(
-        IdentityInterface(fields=['subject_id']),
+        IdentityInterface(fields=iterable_fields),
         name="infosource"
     )
-    infosource.iterables = [('subject_id', subject_list)]  # ← This creates parallel executions
-    
+
+    # Build iterables dict from config/inputs
+    iterables_dict = {}
+    print(f"Iterating over fields: {iterable_fields}")
+    print(f"Provided iterable values: {iterable_values}")
+    for field in iterable_fields:
+        print(f"Processing iterable field: {field}")
+        if field in iterable_values.keys():
+            print(f"Using custom values for field: {field}")
+            # Allow config to override with custom values per field
+            iterables_dict[field] = iterable_values[field]
+        # TODO: Add support for dynamic discovery of values (e.g. from filesystem) if not provided in config
+        else:
+            print(iterable_values[field])
+            raise ValueError(f"No values provided for iterable field: {field}")
+
+    print(f"Final iterables dict: {iterables_dict}")
+    # Transpose: [{'sub':'01', 'task':'A'}, {'sub':'01', 'task':'B'}] -> {'sub':['01','01'], 'task':['A','B']}
+    infosource.iterables = [(field, values) for field, values in iterables_dict.items()]
+    infosource.synchronize = True # Ensure all fields are iterated in sync (e.g., subject and session together)
+
     # === FILE SELECTION ===
-    templates = {"meg": "{subject_id}/meg/{subject_id}_task-MMNHCS_run-0_meg.fif"}
     selectraw = Node(
-        SelectFiles(templates, base_directory=raw_dir),
+        SelectFiles(file_templates, base_directory=raw_dir),
         name="selectfiles"
     )
+
+    # connect the dynamic fields (subject->subject)
+    for field in iterable_fields:
+        wf.connect(infosource, field, selectraw, field)
     
     # === PROCESSING NODE (regular Node, NOT MapNode) ===
     # iterables handles the iteration, so no iterfield needed
@@ -83,7 +103,6 @@ def create_meg_preprocessing(
     
     # === CONNECTIONS ===
     wf.connect([
-        (infosource, selectraw, [("subject_id", "subject_id")]),
         (selectraw, initial_preproc, [("meg", "in_file")]),
         (initial_preproc, artifact_rejection, [("out_file", "in_file")]),
         (artifact_rejection, ica, [("out_file", "in_file")]),
@@ -91,7 +110,5 @@ def create_meg_preprocessing(
     ])
     
     # Log workflow structure (after creation, not during)
-    logger.info(f"Created workflow with {len(subject_list)} subjects")
-    logger.debug(f"Subject list: {subject_list}")
     
     return wf

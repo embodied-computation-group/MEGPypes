@@ -46,7 +46,7 @@ def apply_zapline_denoising(
             data_to_denoise,
             fs=sfreq,
             axis=1,
-            nperseg=int(sfreq * 4),
+            nperseg=nfft,
             nfft=nfft
         )
 

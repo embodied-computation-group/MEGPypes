@@ -52,11 +52,21 @@ def gradient_compensation(raw, auto=True, order=3):
     raw_copy = raw.copy()
 
     if auto:
+        # extract the compoensation matrices from raw metadata
         comps = raw_copy.info.get("comps", [])
         if comps:
-            k = max(range(len(comps)))
-            logger.debug(f"Auto gradient compensation order: {k}")
-            raw_copy.apply_gradient_compensation(k)
+            # Extract all unique grade values from available compensation matrices
+            available_grades = set()
+            for comp in comps:
+                available_grades.add(comp.get('row', 0))
+                available_grades.add(comp.get('col', 0))
+            
+            if available_grades:
+                k = max(available_grades)
+                logger.debug(f"Auto gradient compensation order: {k} (available grades: {sorted(available_grades)})")
+                raw_copy.apply_gradient_compensation(k)
+            else:
+                logger.warning("No valid compensation grades found.")
         else:
             logger.warning("No gradient compensation matrices available.")
     else:
@@ -64,8 +74,7 @@ def gradient_compensation(raw, auto=True, order=3):
         raw_copy.apply_gradient_compensation(order)
 
     logger.info(f"Done: Gradient Compensation")
-
-    return raw
+    return raw_copy
     
 def set_channels(in_file, ch_dict: dict):
     logger.info(f"Setting channel types for: {in_file}")
