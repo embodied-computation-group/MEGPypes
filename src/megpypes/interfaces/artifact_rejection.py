@@ -17,6 +17,7 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
 
     # Enable steps on/off
     enable_zapline = traits.Bool(True, usedefault=True, desc="Flag to enable Zapline Denoising.")
+    enable_compute_ica = traits.Bool(True, usedefault=True, desc="Flag to enable ICA decomposition for artifact rejection.")
 
     # 1. Zapline denoising
     fline = traits.Float(50.0, usedefault=True, desc="Power line frequency (Hz)")
@@ -28,12 +29,21 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
     mag_only = traits.Bool(True, usedefault=True, desc="Process only magnetometer channels")
     detect_line_freq = traits.Bool(True, usedefault=True, desc="Automatically detect line frequency from data (overrides fline if True)")
 
+    # 2. Compute ICA components (if not already computed)
+    ica_random_state = traits.Int(mandatory=True, desc="Random seed for ICA reproducibility")
+    ica_n_components = traits.Int(20, usedefault=True, desc="Number of ICA components to compute")
+    ica_l_freq = traits.Float(1.0, usedefault=True, desc="High-pass frequency for ICA fitting (Hz)")
+    ica_h_freq = traits.Float(30.0, usedefault=True, desc="Low-pass frequency for ICA fitting (Hz)")
+    ica_method = traits.Enum("fastica","picard","infomax",usedefault=True,desc="ICA algorithm to use")
+
     # Output
     out_file = traits.Str("artifact_cleaned_raw.fif", usedefault=True, desc="Output filename")
+    ica_file = traits.Str("ica-icasolution.fif", usedefault=True, desc="ICA output filename")
     
 
 class ArtifactRejectionOutputSpec(TraitedSpec):
     out_file = File(exists=True, desc="Artifact-cleaned MEG file")
+    ica_file = traits.File(exists=True, desc="ICA decomposition used for cleaning")
 
 class ArtifactRejection(BaseInterface):
     input_spec = ArtifactRejectionInputSpec
@@ -64,6 +74,21 @@ class ArtifactRejection(BaseInterface):
                 mag_only=self.inputs.mag_only,
                 detect_line_freq=self.inputs.detect_line_freq
             )
+
+        if self.inputs.enable_compute_ica:
+            # 2. ICA 
+            ica_comps = compute_ica(
+                raw=raw,
+                random_state=self.inputs.ica_random_state,
+                n_components=self.inputs.ica_n_components,
+                filt_low=self.inputs.ica_l_freq,
+                filt_high=self.inputs.ica_h_freq,
+                method=self.inputs.ica_method
+            )
+            # save ica
+            ica_path = os.path.abspath(self.inputs.ica_file)
+            ica_comps.save(ica_path, overwrite=True)
+            logger.info(f"Saved ICA: {ica_path}")
 
         # Save output file
         logger.info(f"OUT FILE PATH: {self.inputs.out_file}")

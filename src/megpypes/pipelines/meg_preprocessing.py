@@ -77,15 +77,13 @@ def create_meg_preprocessing(
     # === PROCESSING NODE (regular Node, NOT MapNode) ===
     # iterables handles the iteration, so no iterfield needed
     initial_preproc = Node(InitialPreproc(), name='initial_preproc')
-    apply_interface_config(initial_preproc, pipeline_config["initial_preproc"])
+    initial_preproc = apply_interface_config(initial_preproc, pipeline_config["initial_preproc"])
 
     # ==== Artifact Rejection ====
     artifact_rejection = Node(ArtifactRejection(), name="artifact_rejection")
-    apply_interface_config(artifact_rejection, pipeline_config["artifact_rejection"])
+    artifact_rejection = apply_interface_config(artifact_rejection, pipeline_config["artifact_rejection"])
 
-    # === Auto ICA ====
-    ica = Node(AutoICA(), name="auto_ica")
-    apply_interface_config(ica, pipeline_config["auto_ica"])
+    # === Apply ICA ====
 
     # === Epoching ====
     #epoching = Node(Epoching(), name="epoching")
@@ -105,8 +103,7 @@ def create_meg_preprocessing(
     wf.connect([
         (selectraw, initial_preproc, [("meg", "in_file")]),
         (initial_preproc, artifact_rejection, [("out_file", "in_file")]),
-        (artifact_rejection, ica, [("out_file", "in_file")]),
-        (ica, datasink, [("out_file", "megpreproc.@final")]),
+        (artifact_rejection, datasink, [("out_file", "megpreproc.@final")])
     ])
     
     # Log workflow structure (after creation, not during)

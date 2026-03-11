@@ -20,10 +20,9 @@ workflow:
 pipeline_config:
   initial_preproc:
     steps:
-      crop: true       # TODO: !NOT IMPLEMENTED!
-      filter: true     # TODO: !NOT IMPLEMENTED!
-      gradcomp: true   # TODO: !NOT IMPLEMENTED!
-      ica: true        # TODO: !NOT IMPLEMENTED!
+      crop: true       # TODO: !NOT IMPLEMENTED in interface!
+      filter: true     # TODO: !NOT IMPLEMENTED in interaface!
+      gradcomp: true   # TODO: !NOT IMPLEMENTED in interface!
 
     args:
       crop:
@@ -40,6 +39,7 @@ pipeline_config:
   artifact_rejection:
     steps:
       zapline: true     # Enable/disable Zapline for line noise removal
+      compute_ica: true  # Enable/disable computation of ICA decomposition solution
 
     args:
       zapline:          # Denoising Source Separation (DSS) parameters
@@ -51,6 +51,13 @@ pipeline_config:
         n_iter_max: 100             # Maximum number of iterations for Zapline
         mag_only: true             # Process only magnetometer channels with Zapline
         detect_line_freq: True    # Automatically detect line frequency from data (overrides fline if True)
+
+      compute_ica:
+        ica_random_state: 821        # Random seed for reproducibility
+        ica_n_components: 20         # Number of ICA components to compute
+        ica_l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
+        ica_h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
+        method: fastica          # ICA method: fastica, infomax, etc.
 
   auto_ica:
     steps:

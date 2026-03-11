@@ -50,6 +50,10 @@ def apply_interface_config(node, config: dict):
 
         step_args = args.get(step, {})
 
+        # Special case: nested args sections
+        if step_args == {} and step in args:
+            step_args = args[step]
+
         for k, v in step_args.items():
             print(f"Step '{step}' argument '{k}': {v}")
             if k in valid_inputs:
