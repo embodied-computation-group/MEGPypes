@@ -57,7 +57,7 @@ pipeline_config:
         ica_n_components: 20         # Number of ICA components to compute
         ica_l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
         ica_h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
-        method: fastica          # ICA method: fastica, infomax, etc.
+        ica_method: fastica          # ICA method: fastica, infomax, etc.
 
   auto_ica:
     steps:

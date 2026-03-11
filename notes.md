@@ -12,7 +12,8 @@
 
 # LOG
 
-### 7/3 March
+## March
+### 7/3 
 
 **RunFinder**
 I am trying to create a RunFinder class procfuns.runs.
@@ -25,3 +26,7 @@ This is neccesary to correctly handle CTF data, and experiments with several ses
 In the pipeline I have currently tried to test artifact rejection but stumbles upon the fact that the opneneuro meg dataset is already fairly preprocessed with 1,40 bandpass filtering, excluding any line noise, therefore zapline is failing and generally the pipeline is unnecessary for this.
 
 I will instead adapt the pipeline for Melinas dataset, however this require "Non-BIDS compliant" data handling.
+
+### 11/3
+**ICA Exclusion split**
+I have to split up workflow to allow for intermediate user specification of ICA exlcusion based on source plots of compoenents.

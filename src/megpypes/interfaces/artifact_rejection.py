@@ -39,11 +39,12 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
     # Output
     out_file = traits.Str("artifact_cleaned_raw.fif", usedefault=True, desc="Output filename")
     ica_file = traits.Str("ica-icasolution.fif", usedefault=True, desc="ICA output filename")
+    ica_plot_path = traits.Str("ica_comps_source_plot.png", usedefault=True, desc="ICA source plot filename")
     
-
 class ArtifactRejectionOutputSpec(TraitedSpec):
-    out_file = File(exists=True, desc="Artifact-cleaned MEG file")
+    out_file = traits.File(exists=True, desc="Artifact-cleaned MEG file")
     ica_file = traits.File(exists=True, desc="ICA decomposition used for cleaning")
+    ica_plot = traits.File(exists=True, desc="Plot for inspection of ICA components")
 
 class ArtifactRejection(BaseInterface):
     input_spec = ArtifactRejectionInputSpec
@@ -90,6 +91,10 @@ class ArtifactRejection(BaseInterface):
             ica_comps.save(ica_path, overwrite=True)
             logger.info(f"Saved ICA: {ica_path}")
 
+            # Plot ICA sources and save png
+            fig = ica_comps.plot_components(show=False)
+            fig.savefig(self.inputs.ica_plot_path)
+
         # Save output file
         logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
         out_path = os.path.abspath(self.inputs.out_file)
@@ -102,5 +107,7 @@ class ArtifactRejection(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["ica_file"] = os.path.abspath(self.inputs.ica_file)
+        outputs["ica_plot"] = os.path.abspath(self.inputs.ica_plot_path)
         return outputs
     

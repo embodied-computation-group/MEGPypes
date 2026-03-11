@@ -103,7 +103,11 @@ def create_meg_preprocessing(
     wf.connect([
         (selectraw, initial_preproc, [("meg", "in_file")]),
         (initial_preproc, artifact_rejection, [("out_file", "in_file")]),
-        (artifact_rejection, datasink, [("out_file", "megpreproc.@final")])
+        (artifact_rejection, datasink, [
+            ("out_file", "megpreproc.@final_raw"),
+            ("ica_file", "megpreproc.@final_ica"),
+            ("ica_plot", "megpreproc.@final_ica_plot")
+        ])
     ])
     
     # Log workflow structure (after creation, not during)
