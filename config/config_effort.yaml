@@ -80,7 +80,15 @@ pipeline_config:
   
   epoching:
     steps:
-      epoch: true       # TODO: !NOT IMPLEMENTED!
+      epoch: True       # TODO: !NOT IMPLEMENTED!
+      autoreject: True
+    
+    iterables:
+      event_mapping: {
+        "19" : ["cue_onset", -1.0, 1.0],
+        "4" : ["force_start", -0.5, 5.0],
+        "8" : ["feedback_onset", -1.0, 1.5]
+      }
 
     args:
       epoch:

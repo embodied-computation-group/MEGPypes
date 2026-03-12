@@ -54,13 +54,17 @@ def apply_interface_config(node, config: dict):
         if step_args == {} and step in args:
             step_args = args[step]
 
-        for k, v in step_args.items():
-            print(f"Step '{step}' argument '{k}': {v}")
-            if k in valid_inputs:
-                params[k] = v
-            else:
-                print(f"Warning: '{k}' is not a valid input for {node.name} interface.")
+        if step_args:
+            for k, v in step_args.items():
+                print(f"Step '{step}' argument '{k}': {v}")
+                if k in valid_inputs:
+                    params[k] = v
+                else:
+                    print(f"Warning: '{k}' is not a valid input for {node.name} interface.")
+        else:
+            print(f"No step args specified for step {step}")
 
     set_node_inputs(node, params)
+    
 
     return node

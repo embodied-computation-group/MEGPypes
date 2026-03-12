@@ -83,11 +83,34 @@ def create_meg_preprocessing(
     artifact_rejection = Node(ArtifactRejection(), name="artifact_rejection")
     artifact_rejection = apply_interface_config(artifact_rejection, pipeline_config["artifact_rejection"])
 
-    # === Apply ICA ====
+    # === Auto ICA ====
+    auto_ica = Node(AutoICA(), name='auto_ica')
+    auto_ica = apply_interface_config(auto_ica, pipeline_config["auto_ica"])
 
     # === Epoching ====
-    #epoching = Node(Epoching(), name="epoching")
-    #apply_interface_config(epoching, pipeline_config["epoching"])
+    # Tranform dict into list iterables
+    event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
+    event_ids = []
+    event_labels = []
+    event_tmins = []
+    event_tmaxs = []
+
+    for event_id, (label, tmin, tmax) in event_mapping.items():
+        event_ids.append(int(event_id))
+        event_labels.append(label)
+        event_tmins.append(tmin)
+        event_tmaxs.append(tmax)
+
+    # setup epoching node
+    epoching = Node(Epoching(), name="epoching")
+    epoching.iterables = [
+        ("event_id", event_ids),
+        ("event_label", event_labels),
+        ("event_tmin", event_tmins),
+        ("event_tmax", event_tmaxs),
+    ]
+    epoching.synchronize = True
+    apply_interface_config(epoching, pipeline_config["epoching"])
     
     # === OUTPUT ===
     datasink = Node(
@@ -107,6 +130,10 @@ def create_meg_preprocessing(
             ("out_file", "megpreproc.@final_raw"),
             ("ica_file", "megpreproc.@final_ica"),
             ("ica_plot", "megpreproc.@final_ica_plot")
+        ]),
+        (artifact_rejection, epoching, [("out_file", "in_file")]),
+        (epoching, datasink, [
+            ("out_file", "megpreproc.@final_epo")
         ])
     ])
     
