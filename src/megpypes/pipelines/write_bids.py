@@ -2,21 +2,33 @@
 import string
 import os
 
-def build_bids_container(bids_dir_path, input_wf_dir, **iterables):
+def build_bids_container(bids_dir_name, input_wf_dir, **iterables):
     """
     Dynamically constructs BIDS compliant directories and filename substitutions.
     (Nipype Function nodes must be completely self-contained).
     """
     # check the existence of the 
+    from pathlib import Path
     import os
 
+    # list all available folders that this can see
+    if not isinstance(bids_dir_name, Path):
+        bids_dir_name = Path(bids_dir_name)
+    if not isinstance(input_wf_dir, Path):
+        input_wf_dir = Path(input_wf_dir)
+    folders = bids_dir_name.glob("*")
+    print(f"absolute path of bids_dir_name: {bids_dir_name.absolute()}")
+    print(f"Parent directory: {bids_dir_name.absolute().parents[2]}")
+    root = bids_dir_name.absolute().parents[2]
+    bids_output_dir = root / bids_dir_name
+
     # first create directory
-    os.makedirs(bids_dir_path, exist_ok=True)
+    os.makedirs(bids_output_dir, exist_ok=True)
 
     # then look for current iterable
     print("Received iterables:", iterables)
     # find the correct folder based on iterables
-    folders = os.listdir(input_wf_dir)
+    folders = input_wf_dir.glob("*")
     print("Available folders in input workflow directory:", folders)
     # find the folder that matches the iterables
     target_folder = None
@@ -41,7 +53,7 @@ def build_bids_container(bids_dir_path, input_wf_dir, **iterables):
         raise ValueError("Subject identifier not found in iterables. Expected keys: 'subject_id', 'subject', or 'sub'.")
     
     bids_sub = f"sub-{subject}"
-    bids_dir = os.path.join(bids_dir_path, bids_sub)
+    bids_dir = os.path.join(bids_output_dir, bids_sub)
     
     # then build the session if it exists
     if session:

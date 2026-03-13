@@ -30,3 +30,9 @@ I will instead adapt the pipeline for Melinas dataset, however this require "Non
 ### 11/3
 **ICA Exclusion split**
 I have to split up workflow to allow for intermediate user specification of ICA exlcusion based on source plots of compoenents.
+
+### 13/3
+**BIDS Writer**
+I am trying to create a bids writer Node.
+I have been messing around with path handling a bit weirdly, 
+I think it makes much more sense to have pathlib find the absolute path outside of the node itself and then pass that to the node instead of passing relative path name which is then instanced at the node working dir and then looking for parents...

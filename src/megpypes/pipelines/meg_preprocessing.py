@@ -173,7 +173,7 @@ def create_meg_preprocessing(
 
     
     # === Build BIDS container ===
-    build_bids_inputs = ["bids_dir_path", "input_wf_dir"] + iterable_fields # Allow dynamic fields to be passed to the function
+    build_bids_inputs = ["bids_dir_name", "input_wf_dir"] + iterable_fields # Allow dynamic fields to be passed to the function
     build_bids = Node(
         Function(
             inputs=build_bids_inputs,
@@ -182,7 +182,7 @@ def create_meg_preprocessing(
         ),
         name="build_bids_container"
     )
-    build_bids.inputs.bids_dir_path = output_dir
+    build_bids.inputs.bids_dir_name = output_dir
     build_bids.inputs.input_wf_dir = f"{wf.base_dir}/{wf_name}"
 
     for field in iterable_fields:
