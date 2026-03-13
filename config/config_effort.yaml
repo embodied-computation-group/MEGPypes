@@ -38,7 +38,7 @@ pipeline_config:
 
   artifact_rejection:
     steps:
-      zapline: true     # Enable/disable Zapline for line noise removal
+      zapline: False     # Enable/disable Zapline for line noise removal
       compute_ica: true  # Enable/disable computation of ICA decomposition solution
 
     args:

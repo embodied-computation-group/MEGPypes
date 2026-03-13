@@ -4,14 +4,38 @@ import string
 from msgspec import field
 from parse import compile as parse_compile
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
+from nipype.interfaces.utility import Function
 from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
 from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
 from megpypes.interfaces.epoching import Epoching
 from megpypes.pipelines.utils import apply_interface_config
+from megpypes.pipelines.write_bids import build_bids_container
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _build_bids_container(subject=None, session=None, subject_id=None, ses=None):
+    """Build DataSink container path from iterable entities."""
+    parts = []
+
+    subject_value = subject if subject is not None else subject_id
+    session_value = session if session is not None else ses
+
+    if subject_value is not None:
+        sub = str(subject_value)
+        if not sub.startswith("sub-"):
+            sub = f"sub-{sub}"
+        parts.append(sub)
+
+    if session_value is not None:
+        ses_value = str(session_value)
+        if not ses_value.startswith("ses-"):
+            ses_value = f"ses-{ses_value}"
+        parts.append(ses_value)
+
+    return "/".join(parts)
 
 def create_meg_preprocessing(
     basedir: str,
@@ -63,7 +87,7 @@ def create_meg_preprocessing(
     print(f"Final iterables dict: {iterables_dict}")
     # Transpose: [{'sub':'01', 'task':'A'}, {'sub':'01', 'task':'B'}] -> {'sub':['01','01'], 'task':['A','B']}
     infosource.iterables = [(field, values) for field, values in iterables_dict.items()]
-    infosource.synchronize = True # Ensure all fields are iterated in sync (e.g., subject and session together)
+    infosource.synchronize = False # Ensure all fields are iterated in sync (e.g., subject and session together)
 
     # === FILE SELECTION ===
     selectraw = Node(
@@ -91,20 +115,11 @@ def create_meg_preprocessing(
     # === Output (datasink) ===
     datasink = Node(
         DataSink(
-            base_directory=output_dir,
-            container="derivatives/megpreproc",
+            base_directory="output",
             parameterization=True
         ),
         name="datasink"
     )
-    datasink.inputs.base_directory = f"{wf_name}_output"
-    print(f"datasink container {datasink.inputs.container}")
-
-    wf.connect([
-        (infosource, datasink, [
-            ("subject", "container"),
-        ])
-    ])
     
     # === CONNECTIONS ===
     wf.connect([
@@ -155,5 +170,22 @@ def create_meg_preprocessing(
         )
 
     # Log workflow structure (after creation, not during)
+
+    
+    # === Build BIDS container ===
+    build_bids_inputs = ["bids_dir_path", "input_wf_dir"] + iterable_fields # Allow dynamic fields to be passed to the function
+    build_bids = Node(
+        Function(
+            inputs=build_bids_inputs,
+            output_names="bids_dir",
+            function=build_bids_container
+        ),
+        name="build_bids_container"
+    )
+    build_bids.inputs.bids_dir_path = output_dir
+    build_bids.inputs.input_wf_dir = f"{wf.base_dir}/{wf_name}"
+
+    for field in iterable_fields:
+        wf.connect(infosource, field, build_bids, field)
     
     return wf
