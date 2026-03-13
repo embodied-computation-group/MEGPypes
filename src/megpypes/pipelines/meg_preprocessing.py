@@ -36,7 +36,8 @@ def create_meg_preprocessing(
         print(f"raw_dir {raw_dir}")
 
     # Create workflow
-    wf = Workflow(name="megpreproc")
+    wf_name = "megpreproc"
+    wf = Workflow(name=wf_name)
     wf.base_dir = workdir
 
     infosource = Node(
@@ -87,56 +88,72 @@ def create_meg_preprocessing(
     auto_ica = Node(AutoICA(), name='auto_ica')
     auto_ica = apply_interface_config(auto_ica, pipeline_config["auto_ica"])
 
-    # === Epoching ====
-    # Tranform dict into list iterables
-    event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
-    event_ids = []
-    event_labels = []
-    event_tmins = []
-    event_tmaxs = []
-
-    for event_id, (label, tmin, tmax) in event_mapping.items():
-        event_ids.append(int(event_id))
-        event_labels.append(label)
-        event_tmins.append(tmin)
-        event_tmaxs.append(tmax)
-
-    # setup epoching node
-    epoching = Node(Epoching(), name="epoching")
-    epoching.iterables = [
-        ("event_id", event_ids),
-        ("event_label", event_labels),
-        ("event_tmin", event_tmins),
-        ("event_tmax", event_tmaxs),
-    ]
-    epoching.synchronize = True
-    apply_interface_config(epoching, pipeline_config["epoching"])
-    
-    # === OUTPUT ===
+    # === Output (datasink) ===
     datasink = Node(
         DataSink(
             base_directory=output_dir,
-            container="preprocessed",
-            parameterization=False  # Clean output paths
+            container="derivatives/megpreproc",
+            parameterization=True
         ),
         name="datasink"
     )
+    datasink.inputs.base_directory = f"{wf_name}_output"
+    print(f"datasink container {datasink.inputs.container}")
+
+    wf.connect([
+        (infosource, datasink, [
+            ("subject", "container"),
+        ])
+    ])
     
     # === CONNECTIONS ===
     wf.connect([
         (selectraw, initial_preproc, [("meg", "in_file")]),
         (initial_preproc, artifact_rejection, [("out_file", "in_file")]),
         (artifact_rejection, datasink, [
-            ("out_file", "megpreproc.@final_raw"),
-            ("ica_file", "megpreproc.@final_ica"),
-            ("ica_plot", "megpreproc.@final_ica_plot")
-        ]),
-        (artifact_rejection, epoching, [("out_file", "in_file")]),
-        (epoching, datasink, [
-            ("out_file", "megpreproc.@final_epo")
+            ("out_file", "meg.@final_raw"),
+            ("ica_file", "meg.@final_ica"),
+            ("ica_plot", "qc.@final_ica_plot")
         ])
     ])
-    
+
+    # === Epoching ====
+    do_epoching = False
+    if do_epoching:
+        # Tranform dict into list iterables
+        event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
+        event_ids = []
+        event_labels = []
+        event_tmins = []
+        event_tmaxs = []
+
+        for event_id, (label, tmin, tmax) in event_mapping.items():
+            event_ids.append(int(event_id))
+            event_labels.append(label)
+            event_tmins.append(tmin)
+            event_tmaxs.append(tmax)
+
+        # setup epoching node
+
+        epoching = Node(Epoching(), name="epoching")
+        epoching.iterables = [
+            ("event_id", event_ids),
+            ("event_label", event_labels),
+            ("event_tmin", event_tmins),
+            ("event_tmax", event_tmaxs),
+        ]
+        epoching.synchronize = True
+        apply_interface_config(epoching, pipeline_config["epoching"])
+
+        wf.connect(
+            [
+                (artifact_rejection, epoching, [("out_file", "in_file")]),
+                (epoching, datasink, [
+                    ("out_file", "megpreproc.@final_epo")
+                ])
+            ]
+        )
+
     # Log workflow structure (after creation, not during)
     
     return wf
