@@ -11,7 +11,7 @@ from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
 from megpypes.interfaces.epoching import Epoching
 from megpypes.pipelines.utils import apply_interface_config
-from megpypes.pipelines.write_bids import build_bids_container
+from megpypes.proc_funcs.write_bids import build_bids_container
 import logging
 logger = logging.getLogger(__name__)
 
