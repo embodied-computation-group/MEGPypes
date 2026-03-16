@@ -15,28 +15,6 @@ from megpypes.pipelines.write_bids import build_bids_container
 import logging
 logger = logging.getLogger(__name__)
 
-
-def _build_bids_container(subject=None, session=None, subject_id=None, ses=None):
-    """Build DataSink container path from iterable entities."""
-    parts = []
-
-    subject_value = subject if subject is not None else subject_id
-    session_value = session if session is not None else ses
-
-    if subject_value is not None:
-        sub = str(subject_value)
-        if not sub.startswith("sub-"):
-            sub = f"sub-{sub}"
-        parts.append(sub)
-
-    if session_value is not None:
-        ses_value = str(session_value)
-        if not ses_value.startswith("ses-"):
-            ses_value = f"ses-{ses_value}"
-        parts.append(ses_value)
-
-    return "/".join(parts)
-
 def create_meg_preprocessing(
     basedir: str,
     workdir: str,
@@ -87,8 +65,7 @@ def create_meg_preprocessing(
     print(f"Final iterables dict: {iterables_dict}")
     # Transpose: [{'sub':'01', 'task':'A'}, {'sub':'01', 'task':'B'}] -> {'sub':['01','01'], 'task':['A','B']}
     infosource.iterables = [(field, values) for field, values in iterables_dict.items()]
-    infosource.synchronize = False # Ensure all fields are iterated in sync (e.g., subject and session together)
-
+    infosource.synchronize = False # 
     # === FILE SELECTION ===
     selectraw = Node(
         SelectFiles(file_templates, base_directory=raw_dir),
@@ -173,19 +150,26 @@ def create_meg_preprocessing(
 
     
     # === Build BIDS container ===
-    build_bids_inputs = ["bids_dir_name", "input_wf_dir"] + iterable_fields # Allow dynamic fields to be passed to the function
+    build_bids_inputs = ["bids_dir_name", "input_wf_dir"] + iterable_fields
+    print(f"Building BIDS container with inputs: {build_bids_inputs}")
     build_bids = Node(
         Function(
-            inputs=build_bids_inputs,
+            input_names=build_bids_inputs,
             output_names="bids_dir",
             function=build_bids_container
         ),
         name="build_bids_container"
     )
     build_bids.inputs.bids_dir_name = output_dir
-    build_bids.inputs.input_wf_dir = f"{wf.base_dir}/{wf_name}"
+    workflow_dir = Path(f"{wf.base_dir}/{wf_name}").absolute()
+    build_bids.inputs.input_wf_dir = workflow_dir
 
+    print(f"infosource iterables: {infosource.iterables}")
     for field in iterable_fields:
-        wf.connect(infosource, field, build_bids, field)
+        if field in ["subject", "session"]:
+            wf.connect(infosource, field, build_bids, field)
+        else:
+            print(f"Connecting extra tag {field}")
+            wf.connect(infosource, field, build_bids, field)
     
     return wf
