@@ -110,7 +110,7 @@ def create_meg_preprocessing(
     ])
 
     # === Epoching ====
-    do_epoching = False
+    do_epoching = True
     if do_epoching:
         # Tranform dict into list iterables
         event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
@@ -160,6 +160,8 @@ def create_meg_preprocessing(
         ),
         name="build_bids_container"
     )
+    wf.connect(datasink, "base_directory", build_bids, "input_wf_dir") # pseudo-connect datasink to bids to structure DAG flow
+
     build_bids.inputs.bids_dir_name = output_dir
     workflow_dir = Path(f"{wf.base_dir}/{wf_name}").absolute()
     build_bids.inputs.input_wf_dir = workflow_dir
@@ -171,5 +173,7 @@ def create_meg_preprocessing(
         else:
             print(f"Connecting extra tag {field}")
             wf.connect(infosource, field, build_bids, field)
+
+    # connect datasink to build_bids
     
     return wf

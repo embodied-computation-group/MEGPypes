@@ -7,7 +7,7 @@ paths:
     meg: "*/{subject}_*_*_{session}.meg4"
   iterable_fields: ["subject", "session"]  # Fields in the template to iterate over (e.g. subject, session)
   iterable_values:
-    subject: ["0001", "0002"]  # List of subjects to process
+    subject: ["0001"]  # List of subjects to process
     session: ["01", "02"]  # List of sessions to process
 
 # Workflow configuration
@@ -92,5 +92,5 @@ pipeline_config:
 
     args:
       epoch:
-        
+        stim_channels: ["UDIO001", "UADC009", "UADC010"]
       autoreject:

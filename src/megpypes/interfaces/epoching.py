@@ -19,13 +19,14 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     autoreject = traits.Bool(True, usedefault=True, desc="Flag to enable autoreject-based epoch rejection")
 
     # 1. Epoching based on events
+    stim_channels = traits.List(traits.Str())
     event_id = traits.Int(mandatory=True)
     event_label = traits.Str(mandatory=True)
     event_tmin = traits.Float(mandatory=True)
     event_tmax = traits.Float(mandatory=True)
     
     # output
-    out_file = traits.Str("epoched_raw-epo.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str(f"{event_label}_epoched_raw-epo.fif", usedefault=True, desc="Output filename")
 
 class EpochingOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="Epoched MEG file")
@@ -71,6 +72,7 @@ class Epoching(BaseInterface):
 
         # TODO: Save Raw epochs for QC
 
+
         # 2. Autoreject-based epoch rejection
         if self.inputs.autoreject:
             logger.info("Running autoreject on epochs")
@@ -92,8 +94,8 @@ class Epoching(BaseInterface):
             # TODO: Crosscheck whether these picks are sufficient or should be merged with grads e.g.
             # CTF system might operate differntly than elektromag
 
-            logger.debug(f"epochs montage: {epochs.get_montage()}")
-            logger.debug(len(epochs.info["dig"]) if epochs.info.get("dig") else "No dig points")
+            logger.info(f"epochs montage: {epochs.get_montage()}")
+            logger.info(len(epochs.info["dig"]) if epochs.info.get("dig") else "No dig points")
 
             ar = AutoReject(
                 n_interpolate=[1, 4, 32], # TODO: What should these values be?
@@ -112,7 +114,7 @@ class Epoching(BaseInterface):
 
         # Save epoched data
         logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
-        out_path = os.path.abspath(f"{self.inputs.event_label}-epo.fif")
+        out_path = os.path.abspath(f"{self.inputs.out_file}")
         final_epochs.save(out_path, overwrite=True)
         logger.info(f"Saved: {out_path}")
 
