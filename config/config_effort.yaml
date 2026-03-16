@@ -81,7 +81,7 @@ pipeline_config:
   epoching:
     steps:
       epoch: True       # TODO: !NOT IMPLEMENTED!
-      autoreject: True
+      autoreject: False
     
     iterables:
       event_mapping: {

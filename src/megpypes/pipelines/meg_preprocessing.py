@@ -3,7 +3,7 @@ import string
 
 from msgspec import field
 from parse import compile as parse_compile
-from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
+from nipype import JoinNode, Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
 from nipype.interfaces.utility import Function
 from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
@@ -137,20 +137,26 @@ def create_meg_preprocessing(
         epoching.synchronize = True
         apply_interface_config(epoching, pipeline_config["epoching"])
 
+        # collect the epochs
+        collect_epochs = JoinNode(
+            IdentityInterface(fields=["epo_files"]),
+            joinsource="epoching",   # join within each subject/session branch
+            joinfield="epo_files",     # field to aggregate into a list
+            name="collect_epochs",
+        )
+
         wf.connect(
             [
                 (artifact_rejection, epoching, [("out_file", "in_file")]),
-                (epoching, datasink, [
-                    ("out_file", "megpreproc.@final_epo")
-                ])
+                (epoching, collect_epochs, [("out_file", "epo_files")]),
+                (collect_epochs, datasink, [("epo_files", "meg.@final_epo")]),
             ]
         )
 
     # Log workflow structure (after creation, not during)
 
-    
     # === Build BIDS container ===
-    build_bids_inputs = ["bids_dir_name", "input_wf_dir"] + iterable_fields
+    build_bids_inputs = ["bids_dir_name", "input_wf_dir", "datasink_output"] + iterable_fields
     print(f"Building BIDS container with inputs: {build_bids_inputs}")
     build_bids = Node(
         Function(
@@ -160,10 +166,12 @@ def create_meg_preprocessing(
         ),
         name="build_bids_container"
     )
-    wf.connect(datasink, "base_directory", build_bids, "input_wf_dir") # pseudo-connect datasink to bids to structure DAG flow
+    print(f"datasink outputs: {datasink.outputs}")
+    wf.connect(datasink, "out_file", build_bids, "datasink_output") # pseudo-connect datasink to bids to structure DAG flow
 
     build_bids.inputs.bids_dir_name = output_dir
     workflow_dir = Path(f"{wf.base_dir}/{wf_name}").absolute()
+    print(f"workflow_dir: {workflow_dir}")
     build_bids.inputs.input_wf_dir = workflow_dir
 
     print(f"infosource iterables: {infosource.iterables}")

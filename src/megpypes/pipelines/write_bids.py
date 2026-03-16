@@ -1,8 +1,4 @@
-
-import string
-import os
-
-def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str | None = None, **extra_tags):
+def build_bids_container(bids_dir_name, input_wf_dir, datasink_output, subject: str, session: str | None = None, **extra_tags):
     """
     Dynamically constructs BIDS compliant directories and filename substitutions.
     (Nipype Function nodes must be completely self-contained).
@@ -10,6 +6,11 @@ def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str
     # check the existence of the 
     from pathlib import Path
     import os
+
+    if not isinstance(bids_dir_name, str):
+        raise ValueError("bids_dir_name must be a string.")
+    if not isinstance(input_wf_dir, Path):
+        raise ValueError("input_wf_dir must be a Path object.")
 
     if not subject:
         raise ValueError("Subject identifier is required to build BIDS directory structure.")
@@ -45,6 +46,7 @@ def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str
     bids_sub_str = f"sub-{subject}"
 
     bids_dir = bids_output_dir / bids_sub_str
+    bids_ses_str = None
     
     # then build the optional session if more than 1
     if session:
@@ -67,7 +69,19 @@ def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str
     for file in sub_ses_output_files:
         if file.is_file():
 
-            datatype_dir = file.parents[1].name
+            # Determine the datatype directory
+            parts = file.parts
+            if "output" in parts:
+                output_idx = parts.index("output")
+                # Datatype is the first path component right after "output".
+                if output_idx + 1 < len(parts) - 1:
+                    datatype_dir = parts[output_idx + 1]
+                else:
+                    # Fallback for files placed directly under "output" with no datatype folder.
+                    datatype_dir = "misc"
+            else:
+                # Defensive fallback if filtering changes upstream.
+                datatype_dir = file.parent.name
             print(f"datatype directory: {datatype_dir}")
             
             filename = f"{bids_sub_str}"

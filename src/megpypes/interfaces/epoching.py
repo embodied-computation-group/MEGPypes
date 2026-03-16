@@ -3,6 +3,7 @@
 """
 import os
 import mne
+from pathlib import Path
 from collections import Counter
 from autoreject import AutoReject
 from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, TraitedSpec, traits
@@ -16,7 +17,7 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     
     # steps on/off
     epoch = traits.Bool(True, usedefault=True, desc="Flag to enable epoching of data")
-    autoreject = traits.Bool(True, usedefault=True, desc="Flag to enable autoreject-based epoch rejection")
+    autoreject = traits.Bool(True, desc="Flag to enable autoreject-based epoch rejection")
 
     # 1. Epoching based on events
     stim_channels = traits.List(traits.Str())
@@ -26,7 +27,7 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     event_tmax = traits.Float(mandatory=True)
     
     # output
-    out_file = traits.Str(f"{event_label}_epoched_raw-epo.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str(f"epoched-epo.fif", usedefault=True, desc="Output filename")
 
 class EpochingOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="Epoched MEG file")
@@ -50,7 +51,7 @@ class Epoching(BaseInterface):
         raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
 
         # 1. Epoching based on events
-        events = handle_find_events(raw)
+        events = handle_find_events(raw, stim_channel=self.inputs.stim_channels)
         logger.debug(f"events: {events}")
 
         mask = events[:, 2] == self.inputs.event_id
@@ -106,15 +107,18 @@ class Epoching(BaseInterface):
             # TODO: Save the ar object for later QC of rejected epochs and channels
             # we can use the included ar.get_reject_log() function 
             ar.fit(epochs_meg)
-            ar_epochs = ar.transform(epochs)
+            ar_epochs = ar.transform(epochs_meg)
 
             final_epochs = ar_epochs
         else:
             final_epochs = epochs
 
         # Save epoched data
-        logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
-        out_path = os.path.abspath(f"{self.inputs.out_file}")
+        new_out_file_str = f"{self.inputs.event_label}_{self.inputs.out_file}"
+        # write this to input spec
+        self.inputs.out_file = new_out_file_str
+        out_path = Path(new_out_file_str).absolute()
+        logger.info(f"OUT FILE PATH: {out_path}")
         final_epochs.save(out_path, overwrite=True)
         logger.info(f"Saved: {out_path}")
 
