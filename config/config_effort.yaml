@@ -1,9 +1,14 @@
 # Paths configuration
 paths:
-  basedir: "data/ds006629"  # Base directory for raw data
+  basedir: "data/effort"  # Base directory for raw data
   workdir: "workdir"        # Directory for intermediate files
   outputdir: "output"       # Directory for final outputs
-  subjects: [sub-01, sub-02]  # List of subjects to process
+  file_templates: 
+    meg: "*/{subject}_*_*_{session}.meg4"
+  iterable_fields: ["subject", "session"]  # Fields in the template to iterate over (e.g. subject, session)
+  iterable_values:
+    subject: ["0001", "0002"]  # List of subjects to process
+    session: ["01", "02"]  # List of sessions to process
 
 # Workflow configuration
 workflow:
@@ -15,10 +20,9 @@ workflow:
 pipeline_config:
   initial_preproc:
     steps:
-      crop: true       # TODO: !NOT IMPLEMENTED!
-      filter: true     # TODO: !NOT IMPLEMENTED!
-      gradcomp: true   # TODO: !NOT IMPLEMENTED!
-      ica: true        # TODO: !NOT IMPLEMENTED!
+      crop: true       # TODO: !NOT IMPLEMENTED in interface!
+      filter: true     # TODO: !NOT IMPLEMENTED in interaface!
+      gradcomp: true   # TODO: !NOT IMPLEMENTED in interface!
 
     args:
       crop:
@@ -30,11 +34,12 @@ pipeline_config:
         h_freq: 100             # High-frequency cutoff (Hz)
       gradcomp:
         gradcomp_auto: true               # Automatically apply gradient compensation (useful for CTF systems)
-        order: 3                 # Order of gradient compensation
+        order:                # Order of gradient compensation
 
   artifact_rejection:
     steps:
-      zapline: true     # Enable/disable Zapline for line noise removal
+      zapline: False     # Enable/disable Zapline for line noise removal
+      compute_ica: true  # Enable/disable computation of ICA decomposition solution
 
     args:
       zapline:          # Denoising Source Separation (DSS) parameters
@@ -47,10 +52,17 @@ pipeline_config:
         mag_only: true             # Process only magnetometer channels with Zapline
         detect_line_freq: True    # Automatically detect line frequency from data (overrides fline if True)
 
+      compute_ica:
+        ica_random_state: 821        # Random seed for reproducibility
+        ica_n_components: 20         # Number of ICA components to compute
+        ica_l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
+        ica_h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
+        ica_method: fastica          # ICA method: fastica, infomax, etc.
+
   auto_ica:
     steps:
-      compute_ica: true  # Enable/disable computation of ICA decomposition solution
-      ic_labels: true    # Enable/disable labeling of ICA components using ICLabel
+      compute_ica: True  # Enable/disable computation of ICA decomposition solution
+      ic_labels: True    # Enable/disable labeling of ICA components using ICLabel
 
     args:
       compute_ica:
@@ -59,15 +71,24 @@ pipeline_config:
         ica_l_freq: 1.0              # Low-frequency cutoff for ICA (Hz)
         ica_h_freq: 30.0             # High-frequency cutoff for ICA (Hz)
         method: fastica          # ICA method: fastica, infomax, etc.
+        precomputed_ica_file:  # Optional path to pre-computed ICA solution (FIF file). If not provided, ICA will be computed from the raw data.
 
-      ic_labels:
+      ic_labels: # Should only be used with EEG data
         ica_exclude: []
         ic_labels_exclude: ["eye blink", "muscle artifact", "heart beat"]  # ICLabel class labels to exclude
         ic_label_threshold: 0.7  # Probability threshold for excluding components based on ICLabel classification
   
   epoching:
     steps:
-      epoch: true       # TODO: !NOT IMPLEMENTED!
+      epoch: True       # TODO: !NOT IMPLEMENTED!
+      autoreject: True
+    
+    iterables:
+      event_mapping: {
+        "19" : ["cue_onset", -1.0, 1.0],
+        "4" : ["force_start", -0.5, 5.0],
+        "8" : ["feedback_onset", -1.0, 1.5]
+      }
 
     args:
       epoch:

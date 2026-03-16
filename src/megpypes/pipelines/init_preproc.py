@@ -1,7 +1,7 @@
 from pathlib import Path
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink
-from src.interfaces.initpreproc import InitialPreproc
-from src.utils import set_node_inputs
+from megpypes.interfaces.initpreproc import InitialPreproc
+from megpypes.utils import set_node_inputs
 import logging
 logger = logging.getLogger(__name__)
 
@@ -10,12 +10,13 @@ def create_initial_preprocessing(
     workdir: str,
     output_dir: str,
     subject_list: list[str],
+    stepflags_params: dict,
     crop_params: dict,
     filter_params: dict,
-    gradcomp_params: dict,
+    gradcomp_params: dict
 ):
     """
-    MEG preprocessing pipeline using classic Nipype iterables pattern.
+    MEG initial (basic) preprocessing pipeline using classic Nipype iterables pattern.
     
     Parallelization: infosource.iterables creates one workflow execution per subject.
     No MapNode needed—iterables handles subject-level iteration.
@@ -52,7 +53,7 @@ def create_initial_preprocessing(
         name='initial_preproc'
     )
     
-    # Define parameters as a dictionary
+    # Define all function parameters as a dictionary
     params = {
         "stim_channel": crop_params["stim_channel"],
         "min_buffer": crop_params["min_buffer"],
@@ -60,8 +61,7 @@ def create_initial_preprocessing(
         "l_freq": filter_params["l_freq"],
         "h_freq": filter_params["h_freq"],
         "gradcomp_auto": gradcomp_params["auto"],
-        "gradcomp_order": gradcomp_params["order"],
-        "out_file": "preproc_raw.fif",
+        "gradcomp_order": gradcomp_params["order"]
     }
 
     # Use the helper function to set node inputs
@@ -84,7 +84,7 @@ def create_initial_preprocessing(
         (initial_preproc, datasink, [("out_file", "megpreproc.@final")]),
     ])
     
-    # Optional: log workflow structure (after creation, not during)
+    # Log workflow structure (after creation, not during)
     logger.info(f"Created workflow with {len(subject_list)} subjects")
     logger.debug(f"Subject list: {subject_list}")
     
