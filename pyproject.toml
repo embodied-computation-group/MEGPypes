@@ -17,6 +17,7 @@ dependencies = [
     "pybids>=0.21.0",
     "pyyaml>=6.0.3",
     "pyzmq>=27.1.0",
+    "streamlit>=1.55.0",
 ]
 
 [tool.pyright]
