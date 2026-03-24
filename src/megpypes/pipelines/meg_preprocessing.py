@@ -105,7 +105,9 @@ def create_meg_preprocessing(
         (artifact_rejection, datasink, [
             ("out_file", "meg.@final_raw"),
             ("ica_file", "meg.@final_ica"),
-            ("ica_plot", "qc.@final_ica_plot")
+            ("ica_plot", "qc.@final_ica_plot"),
+            ("psd_before", "qc.@psd_before"),
+            ("psd_after", "qc.@psd_after")
         ])
     ])
 
@@ -138,8 +140,9 @@ def create_meg_preprocessing(
         apply_interface_config(epoching, pipeline_config["epoching"])
 
         # collect the epochs
+        join_fields = ["epo_files", "plots_raw_epochs", "plots_ar_reject_log", "plots_epochs_after_ar"]
         collect_epochs = JoinNode(
-            IdentityInterface(fields=["epo_files"]),
+            IdentityInterface(fields=join_fields),
             joinsource="epoching",   # join within each subject/session branch
             joinfield="epo_files",     # field to aggregate into a list
             name="collect_epochs",
@@ -147,9 +150,29 @@ def create_meg_preprocessing(
 
         wf.connect(
             [
-                (artifact_rejection, epoching, [("out_file", "in_file")]),
-                (epoching, collect_epochs, [("out_file", "epo_files")]),
-                (collect_epochs, datasink, [("epo_files", "meg.@final_epo")]),
+                (artifact_rejection, epoching, [("out_file", "in_file")]),   
+            ]
+        )
+        #(epoching, collect_epochs, [("out_file", "epo_files")])
+        wf.connect(
+            [
+                (epoching, collect_epochs, [
+                    ("out_file", "epo_files"),
+                    ("plot_raw_epochs", "plots_raw_epochs"),
+                    ("plot_ar_reject_log", "plots_ar_reject_log"),
+                    ("plot_epochs_after_ar", "plots_epochs_after_ar")
+                ])
+            ]
+        )
+        # connect collected epochs to datasink
+        wf.connect(
+            [
+                (collect_epochs, datasink, [
+                    ("epo_files", "meg.@final_epo"),
+                    ("plots_raw_epochs", "qc.@raw_epochs_plot"),
+                    ("plots_ar_reject_log", "qc.@ar_reject_log_plot"),
+                    ("plots_epochs_after_ar", "qc.@ar_epochs_plot")
+                ])
             ]
         )
 

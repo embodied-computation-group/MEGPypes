@@ -1,5 +1,7 @@
 """
 
+Autoreject. https://autoreject.github.io/stable/index.html
+
 """
 import os
 import mne
@@ -28,9 +30,15 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     
     # output
     out_file = traits.Str(f"epoched-epo.fif", usedefault=True, desc="Output filename")
+    plot_raw_epochs = traits.Str("raw_epochs.png", usedefault=True, desc="Filename for raw epochs plot")
+    plot_ar_reject_log = traits.Str("ar_reject_log.png", usedefault=True, desc="Filename for autoreject reject log plot")
+    plot_epochs_after_ar = traits.Str("ar_epochs.png", usedefault=True, desc="Filename for AR-cleaned epochs plot")
 
 class EpochingOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="Epoched MEG file")
+    plot_raw_epochs = traits.File(exists=True, desc="Raw epochs plot")
+    plot_ar_reject_log = traits.File(desc="Autoreject reject log plot")
+    plot_epochs_after_ar = traits.File(desc="AR-cleaned epochs plot")
 
 class Epoching(BaseInterface):
     input_spec = EpochingInputSpec
@@ -71,7 +79,10 @@ class Epoching(BaseInterface):
             preload=True
         )
 
-        # TODO: Save Raw epochs for QC
+        # Save Raw epochs for QC
+        fig = epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+        plot_path = self._save_plot(fig, self.inputs.plot_raw_epochs)
+        logger.debug(f"Saved raw epochs plot: {plot_path}")
 
 
         # 2. Autoreject-based epoch rejection
@@ -104,10 +115,20 @@ class Epoching(BaseInterface):
                 thresh_method="random_search",
                 random_state=893
             )
-            # TODO: Save the ar object for later QC of rejected epochs and channels
-            # we can use the included ar.get_reject_log() function 
+
             ar.fit(epochs_meg)
             ar_epochs = ar.transform(epochs_meg)
+
+            # TODO: Save the ar object for later QC of rejected epochs and channels
+            # we can use the included ar.get_reject_log() function 
+            ar_reject_log = ar.get_reject_log(epochs_meg, show=False).plot()
+            ar_reject_log_path = self._save_plot(ar_reject_log, self.inputs.plot_ar_reject_log)
+            logger.debug(f"Saved AR reject log plot: {ar_reject_log_path}")
+
+            # save AR-cleaned epochs
+            fig = ar_epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+            ar_epochs_plot_path = self._save_plot(fig, self.inputs.plot_epochs_after_ar)
+            logger.debug(f"Saved AR-cleaned epochs plot: {ar_epochs_plot_path}")
 
             final_epochs = ar_epochs
         else:
@@ -128,4 +149,26 @@ class Epoching(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["plot_raw_epochs"] = os.path.abspath(self.inputs.plot_raw_epochs)
+        outputs["plot_ar_reject_log"] = os.path.abspath(self.inputs.plot_ar_reject_log)
+        outputs["plot_epochs_after_ar"] = os.path.abspath(self.inputs.plot_epochs_after_ar)
         return outputs
+    
+    def _save_plot(self, fig, filename):
+        logger.debug(f"_save_plot the fig object: {fig}")
+        path = os.path.abspath(filename)
+        if fig is not None:
+            if isinstance(fig, list):
+                if len(fig) == 1:
+                    fig = fig[0]  # Unpack single-item list
+                elif len(fig) > 1:
+                    logger.warning(f"Expected fig to be a single matplotlib figure, but got a list of length {len(fig)}. Attempting to save anyway.")
+            else:
+                # fig is already a single object, proceed to save
+                pass
+        else:
+            logger.warning(f"Received None for fig, cannot save plot to {path}")
+            return None
+
+        fig.savefig(path)
+        return path

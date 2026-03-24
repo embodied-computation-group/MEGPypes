@@ -32,10 +32,10 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
         None,
         desc="Stimulus channel (string, list of strings, or None)"
     )
-    min_buffer = traits.Float(0.1, usedefault=True, desc="Pre-event crop buffer (s)")
-    max_buffer = traits.Float(0.1, usedefault=True, desc="Post-event crop buffer (s)")
+    min_buffer = traits.Float(0.1, usedefault=False, desc="Pre-event crop buffer (s)")
+    max_buffer = traits.Float(0.1, usedefault=False, desc="Post-event crop buffer (s)")
     # 2. Filter
-    l_freq = traits.Float(1.0, usedefault=True, desc="Low-pass filter cutoff (Hz)")
+    l_freq = traits.Float(1.0, usedefault=False, desc="Low-pass filter cutoff (Hz)")
     h_freq = traits.Float(150.0, usedefault=True, desc="High-pass filter cutoff (Hz)")
     # 3. Gradient compensation
     gradcomp_auto = traits.Bool(True, usedefault=True, desc="Auto gradient compensation")
@@ -66,6 +66,8 @@ class InitialPreproc(BaseInterface):
         
         # Load data
         raw = read_raw_auto(self.inputs.in_file)
+        plot_psd_original = raw.copy().compute_psd().plot(show=False)
+        plot_psd_original.savefig("before_init_preproc.png")
         
         # 1. Crop around events
         raw = crop_to_events(
