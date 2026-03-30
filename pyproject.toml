@@ -8,6 +8,7 @@ dependencies = [
     "auto-mix-prep>=0.2.0",
     "autoreject>=0.4.3",
     "ipykernel>=7.2.0",
+    "ipywidgets>=8.1.8",
     "marimo>=0.20.2",
     "meegkit>=0.1.9",
     "mne>=1.10.2",
@@ -17,6 +18,7 @@ dependencies = [
     "pybids>=0.21.0",
     "pyyaml>=6.0.3",
     "pyzmq>=27.1.0",
+    "streamlit>=1.55.0",
 ]
 
 [tool.pyright]

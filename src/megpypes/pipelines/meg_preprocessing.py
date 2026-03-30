@@ -3,7 +3,7 @@ import string
 
 from msgspec import field
 from parse import compile as parse_compile
-from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
+from nipype import JoinNode, Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
 from nipype.interfaces.utility import Function
 from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
@@ -11,7 +11,7 @@ from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
 from megpypes.interfaces.epoching import Epoching
 from megpypes.pipelines.utils import apply_interface_config
-from megpypes.pipelines.write_bids import build_bids_container
+from megpypes.proc_funcs.write_bids import build_bids_container
 import logging
 logger = logging.getLogger(__name__)
 
@@ -105,12 +105,14 @@ def create_meg_preprocessing(
         (artifact_rejection, datasink, [
             ("out_file", "meg.@final_raw"),
             ("ica_file", "meg.@final_ica"),
-            ("ica_plot", "qc.@final_ica_plot")
+            ("ica_plot", "qc.@final_ica_plot"),
+            ("psd_before", "qc.@psd_before"),
+            ("psd_after", "qc.@psd_after")
         ])
     ])
 
     # === Epoching ====
-    do_epoching = False
+    do_epoching = True
     if do_epoching:
         # Tranform dict into list iterables
         event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
@@ -137,20 +139,47 @@ def create_meg_preprocessing(
         epoching.synchronize = True
         apply_interface_config(epoching, pipeline_config["epoching"])
 
+        # collect the epochs
+        join_fields = ["epo_files", "plots_raw_epochs", "plots_ar_reject_log", "plots_epochs_after_ar"]
+        collect_epochs = JoinNode(
+            IdentityInterface(fields=join_fields),
+            joinsource="epoching",   # join within each subject/session branch
+            joinfield="epo_files",     # field to aggregate into a list
+            name="collect_epochs",
+        )
+
         wf.connect(
             [
-                (artifact_rejection, epoching, [("out_file", "in_file")]),
-                (epoching, datasink, [
-                    ("out_file", "megpreproc.@final_epo")
+                (artifact_rejection, epoching, [("out_file", "in_file")]),   
+            ]
+        )
+        #(epoching, collect_epochs, [("out_file", "epo_files")])
+        wf.connect(
+            [
+                (epoching, collect_epochs, [
+                    ("out_file", "epo_files"),
+                    ("plot_raw_epochs", "plots_raw_epochs"),
+                    ("plot_ar_reject_log", "plots_ar_reject_log"),
+                    ("plot_epochs_after_ar", "plots_epochs_after_ar")
+                ])
+            ]
+        )
+        # connect collected epochs to datasink
+        wf.connect(
+            [
+                (collect_epochs, datasink, [
+                    ("epo_files", "meg.@final_epo"),
+                    ("plots_raw_epochs", "qc.@raw_epochs_plot"),
+                    ("plots_ar_reject_log", "qc.@ar_reject_log_plot"),
+                    ("plots_epochs_after_ar", "qc.@ar_epochs_plot")
                 ])
             ]
         )
 
     # Log workflow structure (after creation, not during)
 
-    
     # === Build BIDS container ===
-    build_bids_inputs = ["bids_dir_name", "input_wf_dir"] + iterable_fields
+    build_bids_inputs = ["bids_dir_name", "input_wf_dir", "datasink_output"] + iterable_fields
     print(f"Building BIDS container with inputs: {build_bids_inputs}")
     build_bids = Node(
         Function(
@@ -160,8 +189,12 @@ def create_meg_preprocessing(
         ),
         name="build_bids_container"
     )
+    print(f"datasink outputs: {datasink.outputs}")
+    wf.connect(datasink, "out_file", build_bids, "datasink_output") # pseudo-connect datasink to bids to structure DAG flow
+
     build_bids.inputs.bids_dir_name = output_dir
     workflow_dir = Path(f"{wf.base_dir}/{wf_name}").absolute()
+    print(f"workflow_dir: {workflow_dir}")
     build_bids.inputs.input_wf_dir = workflow_dir
 
     print(f"infosource iterables: {infosource.iterables}")
@@ -171,5 +204,7 @@ def create_meg_preprocessing(
         else:
             print(f"Connecting extra tag {field}")
             wf.connect(infosource, field, build_bids, field)
+
+    # connect datasink to build_bids
     
     return wf

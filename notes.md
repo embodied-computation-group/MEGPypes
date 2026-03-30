@@ -36,3 +36,13 @@ I have to split up workflow to allow for intermediate user specification of ICA 
 I am trying to create a bids writer Node.
 I have been messing around with path handling a bit weirdly, 
 I think it makes much more sense to have pathlib find the absolute path outside of the node itself and then pass that to the node instead of passing relative path name which is then instanced at the node working dir and then looking for parents...
+
+### 16/3
+**Epoching**
+I succesfully adapted epoching iteration by JoinNode such that it is now compatible with the bids_writer Node as well.
+Now i just need to check if autoreject works now.
+Can take some extra time to run and then I think i am about ready to begin collecting plots for QC.
+And then creating a subsequent QC Interface maybe, or potentially a seperate QC workflow.
+
+AutoICA also needs to be developed.
+And I might also want to plot some head movement from coils just for QC initially.

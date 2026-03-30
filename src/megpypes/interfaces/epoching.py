@@ -1,8 +1,11 @@
 """
 
+Autoreject. https://autoreject.github.io/stable/index.html
+
 """
 import os
 import mne
+from pathlib import Path
 from collections import Counter
 from autoreject import AutoReject
 from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, TraitedSpec, traits
@@ -16,19 +19,26 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     
     # steps on/off
     epoch = traits.Bool(True, usedefault=True, desc="Flag to enable epoching of data")
-    autoreject = traits.Bool(True, usedefault=True, desc="Flag to enable autoreject-based epoch rejection")
+    autoreject = traits.Bool(True, desc="Flag to enable autoreject-based epoch rejection")
 
     # 1. Epoching based on events
+    stim_channels = traits.List(traits.Str())
     event_id = traits.Int(mandatory=True)
     event_label = traits.Str(mandatory=True)
     event_tmin = traits.Float(mandatory=True)
     event_tmax = traits.Float(mandatory=True)
     
     # output
-    out_file = traits.Str("epoched_raw-epo.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str(f"epoched-epo.fif", usedefault=True, desc="Output filename")
+    plot_raw_epochs = traits.Str("raw_epochs.png", usedefault=True, desc="Filename for raw epochs plot")
+    plot_ar_reject_log = traits.Str("ar_reject_log.png", usedefault=True, desc="Filename for autoreject reject log plot")
+    plot_epochs_after_ar = traits.Str("ar_epochs.png", usedefault=True, desc="Filename for AR-cleaned epochs plot")
 
 class EpochingOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="Epoched MEG file")
+    plot_raw_epochs = traits.File(exists=True, desc="Raw epochs plot")
+    plot_ar_reject_log = traits.File(desc="Autoreject reject log plot")
+    plot_epochs_after_ar = traits.File(desc="AR-cleaned epochs plot")
 
 class Epoching(BaseInterface):
     input_spec = EpochingInputSpec
@@ -49,7 +59,7 @@ class Epoching(BaseInterface):
         raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
 
         # 1. Epoching based on events
-        events = handle_find_events(raw)
+        events = handle_find_events(raw, stim_channel=self.inputs.stim_channels)
         logger.debug(f"events: {events}")
 
         mask = events[:, 2] == self.inputs.event_id
@@ -69,7 +79,11 @@ class Epoching(BaseInterface):
             preload=True
         )
 
-        # TODO: Save Raw epochs for QC
+        # Save Raw epochs for QC
+        fig = epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+        plot_path = self._save_plot(fig, self.inputs.plot_raw_epochs)
+        logger.debug(f"Saved raw epochs plot: {plot_path}")
+
 
         # 2. Autoreject-based epoch rejection
         if self.inputs.autoreject:
@@ -92,8 +106,8 @@ class Epoching(BaseInterface):
             # TODO: Crosscheck whether these picks are sufficient or should be merged with grads e.g.
             # CTF system might operate differntly than elektromag
 
-            logger.debug(f"epochs montage: {epochs.get_montage()}")
-            logger.debug(len(epochs.info["dig"]) if epochs.info.get("dig") else "No dig points")
+            logger.info(f"epochs montage: {epochs.get_montage()}")
+            logger.info(len(epochs.info["dig"]) if epochs.info.get("dig") else "No dig points")
 
             ar = AutoReject(
                 n_interpolate=[1, 4, 32], # TODO: What should these values be?
@@ -101,18 +115,31 @@ class Epoching(BaseInterface):
                 thresh_method="random_search",
                 random_state=893
             )
+
+            ar.fit(epochs_meg)
+            ar_epochs = ar.transform(epochs_meg)
+
             # TODO: Save the ar object for later QC of rejected epochs and channels
             # we can use the included ar.get_reject_log() function 
-            ar.fit(epochs_meg)
-            ar_epochs = ar.transform(epochs)
+            ar_reject_log = ar.get_reject_log(epochs_meg, show=False).plot()
+            ar_reject_log_path = self._save_plot(ar_reject_log, self.inputs.plot_ar_reject_log)
+            logger.debug(f"Saved AR reject log plot: {ar_reject_log_path}")
+
+            # save AR-cleaned epochs
+            fig = ar_epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+            ar_epochs_plot_path = self._save_plot(fig, self.inputs.plot_epochs_after_ar)
+            logger.debug(f"Saved AR-cleaned epochs plot: {ar_epochs_plot_path}")
 
             final_epochs = ar_epochs
         else:
             final_epochs = epochs
 
         # Save epoched data
-        logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
-        out_path = os.path.abspath(f"{self.inputs.event_label}-epo.fif")
+        new_out_file_str = f"{self.inputs.event_label}_{self.inputs.out_file}"
+        # write this to input spec
+        self.inputs.out_file = new_out_file_str
+        out_path = Path(new_out_file_str).absolute()
+        logger.info(f"OUT FILE PATH: {out_path}")
         final_epochs.save(out_path, overwrite=True)
         logger.info(f"Saved: {out_path}")
 
@@ -122,4 +149,26 @@ class Epoching(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["plot_raw_epochs"] = os.path.abspath(self.inputs.plot_raw_epochs)
+        outputs["plot_ar_reject_log"] = os.path.abspath(self.inputs.plot_ar_reject_log)
+        outputs["plot_epochs_after_ar"] = os.path.abspath(self.inputs.plot_epochs_after_ar)
         return outputs
+    
+    def _save_plot(self, fig, filename):
+        logger.debug(f"_save_plot the fig object: {fig}")
+        path = os.path.abspath(filename)
+        if fig is not None:
+            if isinstance(fig, list):
+                if len(fig) == 1:
+                    fig = fig[0]  # Unpack single-item list
+                elif len(fig) > 1:
+                    logger.warning(f"Expected fig to be a single matplotlib figure, but got a list of length {len(fig)}. Attempting to save anyway.")
+            else:
+                # fig is already a single object, proceed to save
+                pass
+        else:
+            logger.warning(f"Received None for fig, cannot save plot to {path}")
+            return None
+
+        fig.savefig(path)
+        return path
