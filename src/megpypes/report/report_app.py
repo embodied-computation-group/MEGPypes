@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -213,10 +214,13 @@ def build_report_html(
 
 
 def _default_root() -> str:
+	env_root = os.environ.get("MEGPYPES_REPORT_ROOT")
+	if env_root:
+		return str(Path(env_root).expanduser().resolve())
+
 	workspace = Path.cwd()
 	candidates = [
 		workspace / "workdir" / "megpreproc" / "output",
-		workspace / "output",
 		workspace,
 	]
 	for candidate in candidates:
