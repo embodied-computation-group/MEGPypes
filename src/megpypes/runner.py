@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,6 +32,7 @@ class MegPypesRunner:
         self.config_path = Path(config_path).resolve() if config_path else None
         self.graph_path: Path | None = None
         self._report_process: subprocess.Popen[str] | None = None
+        self._report_port: int | None = None
 
     @classmethod
     def from_yaml(cls, config_path: str | Path) -> "MegPypesRunner":
@@ -230,20 +233,99 @@ class MegPypesRunner:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            start_new_session=True,
         )
+        self._report_port = int(port)
         return self._report_process
+
+    @staticmethod
+    def _find_pids_on_port(port: int) -> set[int]:
+        try:
+            result = subprocess.run(
+                ["lsof", "-ti", f"tcp:{port}"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            return set()
+
+        if result.returncode not in (0, 1):
+            return set()
+
+        pids: set[int] = set()
+        for line in result.stdout.splitlines():
+            value = line.strip()
+            if value.isdigit():
+                pids.add(int(value))
+        return pids
+
+    def _kill_report_port_processes(self, port: int, timeout: float = 3.0) -> None:
+        initial_pids = self._find_pids_on_port(port)
+        if not initial_pids:
+            return
+
+        for pid in initial_pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                continue
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            remaining = initial_pids.intersection(self._find_pids_on_port(port))
+            if not remaining:
+                return
+            time.sleep(0.1)
+
+        remaining = initial_pids.intersection(self._find_pids_on_port(port))
+        for pid in remaining:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                continue
+
+        # Final fallback: use pkill if any processes still listening on port
+        if self._find_pids_on_port(port):
+            try:
+                subprocess.run(
+                    ["pkill", "-9", "-f", f"streamlit.*{port}"],
+                    check=False,
+                    timeout=2,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
 
     def stop_report_app(self, timeout: float = 3.0) -> None:
         process = self._report_process
-        if process is None or process.poll() is not None:
-            return
 
-        process.terminate()
         try:
-            process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=timeout)
+            if process is not None and process.poll() is None:
+                try:
+                    # Streamlit can spawn child processes; terminate the whole process group.
+                    os.killpg(process.pid, signal.SIGTERM)
+                    process.wait(timeout=timeout)
+                except (ProcessLookupError, OSError):
+                    # Process group may not exist or process already dead
+                    pass
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.wait(timeout=timeout)
+                    except (ProcessLookupError, OSError):
+                        pass
+
+            # Fallback: kill any remaining process still bound to the report port.
+            if self._report_port is not None:
+                self._kill_report_port_processes(self._report_port, timeout=timeout)
+        finally:
+            if process is not None and process.stdout is not None:
+                try:
+                    process.stdout.close()
+                except Exception:
+                    pass
+            self._report_process = None
+            self._report_port = None
 
     @staticmethod
     def report_url(*, host: str = "127.0.0.1", port: int = 8501) -> str:
