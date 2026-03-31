@@ -1,7 +1,8 @@
 """
+Epoching Interface
+Creates the NiPype interface for epoching MEG data based on events and optional autoreject-based epoch rejection.
 
 Autoreject. https://autoreject.github.io/stable/index.html
-
 """
 import os
 import mne
@@ -10,11 +11,13 @@ from collections import Counter
 from autoreject import AutoReject
 from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, TraitedSpec, traits
 from megpypes.proc_funcs.epoch import handle_find_events
+from megpypes.interfaces.utils import abspath_with_time
 import logging
 logger = logging.getLogger(__name__)
 
 
 class EpochingInputSpec(BaseInterfaceInputSpec):
+    """Input Specification"""
     in_file = traits.File(exists=True, mandatory=True, desc="Input MEG BaseRaw file")
     
     # steps on/off
@@ -29,18 +32,38 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     event_tmax = traits.Float(mandatory=True)
     
     # output
-    out_file = traits.Str(f"epoched-epo.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str(f"epoched_epo.fif", usedefault=True, desc="Output filename")
     plot_raw_epochs = traits.Str("raw_epochs.png", usedefault=True, desc="Filename for raw epochs plot")
     plot_ar_reject_log = traits.Str("ar_reject_log.png", usedefault=True, desc="Filename for autoreject reject log plot")
     plot_epochs_after_ar = traits.Str("ar_epochs.png", usedefault=True, desc="Filename for AR-cleaned epochs plot")
 
 class EpochingOutputSpec(TraitedSpec):
+    """Output Specification"""
     out_file = traits.File(exists=True, desc="Epoched MEG file")
     plot_raw_epochs = traits.File(exists=True, desc="Raw epochs plot")
     plot_ar_reject_log = traits.File(desc="Autoreject reject log plot")
     plot_epochs_after_ar = traits.File(desc="AR-cleaned epochs plot")
 
 class Epoching(BaseInterface):
+    """
+    NiPype interface for epoching MEG data based on events and optional autoreject-based epoch rejection.
+
+    Steps
+    -----
+        1. Epoching based on events
+        2. (Optional) Autoreject-based epoch rejection
+
+    Returns
+    -------
+    out_file : File
+        Epoched MEG file.
+    plot_raw_epochs : File
+        Raw-epochs QC plot (before autoreject).
+    plot_ar_reject_log : File, optional
+        Autoreject reject-log QC plot.
+    plot_epochs_after_ar : File, optional
+        QC plot of epochs after autoreject.
+    """
     input_spec = EpochingInputSpec
     output_spec = EpochingOutputSpec
 
@@ -81,6 +104,7 @@ class Epoching(BaseInterface):
 
         # Save Raw epochs for QC
         fig = epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+        self.inputs.plot_raw_epochs = abspath_with_time(self.inputs.plot_raw_epochs)
         plot_path = self._save_plot(fig, self.inputs.plot_raw_epochs)
         logger.debug(f"Saved raw epochs plot: {plot_path}")
 
@@ -135,23 +159,23 @@ class Epoching(BaseInterface):
             final_epochs = epochs
 
         # Save epoched data
-        new_out_file_str = f"{self.inputs.event_label}_{self.inputs.out_file}"
+        new_out_file_str = f"{self.inputs.event_label}-{self.inputs.out_file}"
         # write this to input spec
-        self.inputs.out_file = new_out_file_str
-        out_path = Path(new_out_file_str).absolute()
-        logger.info(f"OUT FILE PATH: {out_path}")
-        final_epochs.save(out_path, overwrite=True)
-        logger.info(f"Saved: {out_path}")
+        self.inputs.out_file = abspath_with_time(new_out_file_str)
+        logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
+        final_epochs.save(self.inputs.out_file, overwrite=True)
+        logger.info(f"Saved: {self.inputs.out_file}")
 
         runtime.returncode = 0
         return runtime
     
     def _list_outputs(self):
+        """NiPype method to list outputs after interface execution"""
         outputs = self._outputs().get()
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
-        outputs["plot_raw_epochs"] = os.path.abspath(self.inputs.plot_raw_epochs)
-        outputs["plot_ar_reject_log"] = os.path.abspath(self.inputs.plot_ar_reject_log)
-        outputs["plot_epochs_after_ar"] = os.path.abspath(self.inputs.plot_epochs_after_ar)
+        outputs["out_file"] = self.inputs.out_file
+        outputs["plot_raw_epochs"] = self.inputs.plot_raw_epochs
+        outputs["plot_ar_reject_log"] = self.inputs.plot_ar_reject_log
+        outputs["plot_epochs_after_ar"] = self.inputs.plot_epochs_after_ar
         return outputs
     
     def _save_plot(self, fig, filename):

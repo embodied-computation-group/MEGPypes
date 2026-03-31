@@ -1,8 +1,25 @@
+"""
+High-level API for running the MEG preprocessing pipeline from code or notebooks.
+Implements the `MegPypesRunner` class.
+This module works as the main interaction point for users who want
+to run the MEG preprocessing pipeline using a (YAML) configuration file.
+
+This module defines the `MegPypesRunner` class, which provides methods to:
+- Load configuration from a YAML file or directly from a dictionary
+- Configure Nipype logging
+- Create the Nipype workflow based on the configuration¨
+- Run the workflow with specified plugin and number of workers
+- Optionally write the workflow graph to a file
+- Launch a Streamlit report app to visualize results
+- Stop the Streamlit report app when done
+"""
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,13 +40,34 @@ class PipelineRunResult:
 
 
 class MegPypesRunner:
-    """High-level API for running the MEG preprocessing pipeline from code or notebooks."""
+    """
+    High-level API for running the MEG preprocessing pipeline from code or notebooks.
+    
+    Arguments
+    ---------
+    config: dict
+        Configuration dictionary containing 'paths', 'workflow', and 'pipeline_config' sections.
+    config_path: str | Path, optional
+        Path to the YAML configuration file (used for reference and logging, not required if config dict
+        is provided directly).
+    
+    Methods
+    -------
+    from_yaml(config_path): classmethod
+        Create a MegPypesRunner instance from a YAML configuration file.
+    configure_nipype_logging(...): Path
+        Set up Nipype logging configuration and return the logs directory path.
+    create_workflow(...): Any
+        Create the Nipype workflow based on the configuration.
+    
+    """
     
     def __init__(self, config: dict[str, Any], config_path: str | Path | None = None):
         self.config = config
         self.config_path = Path(config_path).resolve() if config_path else None
         self.graph_path: Path | None = None
         self._report_process: subprocess.Popen[str] | None = None
+        self._report_port: int | None = None
 
     @classmethod
     def from_yaml(cls, config_path: str | Path) -> "MegPypesRunner":
@@ -57,6 +95,7 @@ class MegPypesRunner:
         workflow_level: str = "DEBUG",
         remove_unnecessary_outputs: bool = False,
     ) -> Path:
+        """Configure Nipype logging based on the provided parameters and return the logs directory path."""
         paths = self.paths_config
         logs_dir = Path(paths["workdir"]) / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -84,6 +123,9 @@ class MegPypesRunner:
         paths_override: dict[str, Any] | None = None,
         pipeline_config_override: dict[str, Any] | None = None,
     ) -> Any:
+        """
+        Create the Nipype meg_preprocessing workflow based on the configuration. Allows for optional overrides of paths and pipeline config.
+        """
         paths = self.paths_config
         if paths_override:
             paths.update(paths_override)
@@ -150,6 +192,7 @@ class MegPypesRunner:
         paths_override: dict[str, Any] | None = None,
         pipeline_config_override: dict[str, Any] | None = None,
     ) -> PipelineRunResult:
+        """Run the workflow with the specified plugin and number of workers. Optionally write the workflow graph to a file."""
         self.configure_nipype_logging()
 
         wf = workflow or self.create_workflow(
@@ -186,6 +229,10 @@ class MegPypesRunner:
         app_path: str | Path | None = None,
         extra_args: list[str] | None = None,
     ) -> subprocess.Popen[str]:
+        """
+        Launch a Streamlit report app to visualize QC results and export a report. 
+        If an app is already running, it will be stopped first.
+        """
         if self._report_process is not None and self._report_process.poll() is None:
             self.stop_report_app()
 
@@ -230,20 +277,102 @@ class MegPypesRunner:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            start_new_session=True,
         )
+        self._report_port = int(port)
         return self._report_process
 
-    def stop_report_app(self, timeout: float = 3.0) -> None:
-        process = self._report_process
-        if process is None or process.poll() is not None:
+    @staticmethod
+    def _find_pids_on_port(port: int) -> set[int]:
+        try:
+            result = subprocess.run(
+                ["lsof", "-ti", f"tcp:{port}"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            return set()
+
+        if result.returncode not in (0, 1):
+            return set()
+
+        pids: set[int] = set()
+        for line in result.stdout.splitlines():
+            value = line.strip()
+            if value.isdigit():
+                pids.add(int(value))
+        return pids
+
+    def _kill_report_port_processes(self, port: int, timeout: float = 3.0) -> None:
+        initial_pids = self._find_pids_on_port(port)
+        if not initial_pids:
             return
 
-        process.terminate()
+        for pid in initial_pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                continue
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            remaining = initial_pids.intersection(self._find_pids_on_port(port))
+            if not remaining:
+                return
+            time.sleep(0.1)
+
+        remaining = initial_pids.intersection(self._find_pids_on_port(port))
+        for pid in remaining:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                continue
+
+        # Final fallback: use pkill if any processes still listening on port
+        if self._find_pids_on_port(port):
+            try:
+                subprocess.run(
+                    ["pkill", "-9", "-f", f"streamlit.*{port}"],
+                    check=False,
+                    timeout=2,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+    def stop_report_app(self, timeout: float = 3.0) -> None:
+        """
+        Stop the Streamlit report app if it is running, ensuring that any processes listening on the report port are terminated.
+        """
+        process = self._report_process
+
         try:
-            process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=timeout)
+            if process is not None and process.poll() is None:
+                try:
+                    # Streamlit can spawn child processes; terminate the whole process group.
+                    os.killpg(process.pid, signal.SIGTERM)
+                    process.wait(timeout=timeout)
+                except (ProcessLookupError, OSError):
+                    # Process group may not exist or process already dead
+                    pass
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.wait(timeout=timeout)
+                    except (ProcessLookupError, OSError):
+                        pass
+
+            # Fallback: kill any remaining process still bound to the report port.
+            if self._report_port is not None:
+                self._kill_report_port_processes(self._report_port, timeout=timeout)
+        finally:
+            if process is not None and process.stdout is not None:
+                try:
+                    process.stdout.close()
+                except Exception:
+                    pass
+            self._report_process = None
+            self._report_port = None
 
     @staticmethod
     def report_url(*, host: str = "127.0.0.1", port: int = 8501) -> str:

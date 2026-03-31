@@ -7,5 +7,10 @@
 /workdir
 /crashes
 /datatest
+/notebooks
+/config
 # file patterns
 *.log
+# specific files
+notes.md
+src/megpypes/pipelines/initial_preproc.py

@@ -1,31 +1,23 @@
+"""
+QC visualisation app to investigate MEG preprocessing results.
+This app is designed to be launched from the MEGPypes runner after workflow execution, allowing users to easily navigate through QC plots generated during preprocessing. 
+It automatically discovers subjects and sessions based on the BIDS-like folder structure and displays associated QC images in an organized manner.
+The app also provides an option to export a comprehensive HTML report containing all QC plots for all subjects and sessions, which can be shared or archived for future reference.
+"""
 from __future__ import annotations
 
 import base64
 import html
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
 
-# Editable QC plot definitions. Order in this list is display order.
-QC_PLOT_ORDER: list[dict[str, str]] = [
-	{
-		"file_hint": "desc-psd_before_zapline",
-		"title": "Power Spectral Density Before Zapline",
-	},
-	{
-		"file_hint": "desc-ica_components",
-		"title": "ICA Components",
-	},
-	{
-		"file_hint": "desc-raw_epochs",
-		"title": "Raw Epochs",
-	},
-]
-
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
+DESC_PATTERN = re.compile(r"_desc-(\d+)-(.+)$")
 
 
 @dataclass(frozen=True)
@@ -89,25 +81,26 @@ def discover_sessions(root_dir: str) -> list[SessionInfo]:
 	return sessions
 
 
-def sort_files_by_qc_order(files: list[Path], qc_order: list[dict[str, str]]) -> list[tuple[str, Path]]:
-	used: set[Path] = set()
-	ordered: list[tuple[str, Path]] = []
+def _parse_desc_index_and_title(path: Path) -> tuple[int, str]:
+	stem = path.stem
+	match = DESC_PATTERN.search(stem)
+	if not match:
+		return (10**9, stem)
 
-	for rule in qc_order:
-		hint = rule.get("file_hint", "").strip()
-		title = rule.get("title", hint).strip() or hint
-		if not hint:
-			continue
+	desc_idx = int(match.group(1))
+	raw_title = match.group(2)
+	title = raw_title.replace("_", " ").replace("-", " ").strip().title()
+	return (desc_idx, title)
 
-		matches = [path for path in files if hint in path.name and path not in used]
-		for match in sorted(matches):
-			ordered.append((title, match))
-			used.add(match)
 
-	for remaining in sorted([path for path in files if path not in used]):
-		ordered.append((remaining.stem, remaining))
+def sort_files_by_qc_order(files: list[Path]) -> list[tuple[str, Path]]:
+	parsed: list[tuple[int, str, Path]] = []
+	for path in files:
+		desc_idx, title = _parse_desc_index_and_title(path)
+		parsed.append((desc_idx, title, path))
 
-	return ordered
+	parsed.sort(key=lambda item: (item[0], item[2].name.lower(), str(item[2])))
+	return [(title, path) for _, title, path in parsed]
 
 
 def _img_to_data_uri(image_path: Path) -> str:
@@ -125,13 +118,12 @@ def _img_to_data_uri(image_path: Path) -> str:
 
 def build_report_html(
 	sessions: list[SessionInfo],
-	qc_order: list[dict[str, str]],
 	title: str = "MEG QC Report",
 ) -> str:
 	blocks: list[str] = []
 
 	for session in sessions:
-		ordered_files = sort_files_by_qc_order(session.qc_files, qc_order)
+		ordered_files = sort_files_by_qc_order(session.qc_files)
 		image_sections: list[str] = []
 		for image_title, image_path in ordered_files:
 			data_uri = _img_to_data_uri(image_path)
@@ -229,6 +221,13 @@ def _default_root() -> str:
 	return str(workspace)
 
 
+def _normalize_root_input(root_dir: str) -> str:
+	cleaned = root_dir.strip()
+	if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {'"', "'"}:
+		cleaned = cleaned[1:-1].strip()
+	return cleaned
+
+
 def _ensure_state(session_count: int) -> None:
 	if "selected_session_idx" not in st.session_state:
 		st.session_state.selected_session_idx = 0
@@ -253,20 +252,19 @@ def main() -> None:
 		export_slot = st.empty()
 		st.header("Dataset")
 		root_dir = st.text_input("Output root directory", value=_default_root())
+		root_dir = _normalize_root_input(root_dir)
 		st.caption("App recursively scans for sub-*/ses-* folders containing qc images.")
 
 		if st.button("Refresh data", width="content"):
 			discover_sessions.clear()
 
 		st.header("QC order")
-		st.caption("Edit QC_PLOT_ORDER in this script to define order and titles.")
-		for idx, item in enumerate(QC_PLOT_ORDER, start=1):
-			st.write(f"{idx}. {item['title']} ({item['file_hint']})")
+		st.caption("Plots are auto-ordered by desc-<number> in filenames and titled from the remaining suffix.")
 
 	sessions = discover_sessions(root_dir)
 	total_subjects = len({session.subject for session in sessions})
 	total_sessions = len(sessions)
-	report_html = build_report_html(sessions, QC_PLOT_ORDER)
+	report_html = build_report_html(sessions)
 	export_slot.download_button(
 		label="Export full report",
 		data=report_html.encode("utf-8"),
@@ -289,7 +287,7 @@ def main() -> None:
 			f"""
 			<div class="report-header">
 				<h1>MEG Quality Check Navigator</h1>
-				<p>Navigate subject/session and review QC plots in your predefined order.</p>
+				<p>Navigate subject/session and review QC plots in automatic desc-index order.</p>
 				<div class="report-header-total">Total subjects: {total_subjects}<br>Total sessions: {total_sessions}</div>
 			</div>
 			""",
@@ -306,7 +304,7 @@ def main() -> None:
 		st.session_state.selected_session_idx = selected_idx
 		selected = sessions[selected_idx]
 
-		ordered_plots = sort_files_by_qc_order(selected.qc_files, QC_PLOT_ORDER)
+		ordered_plots = sort_files_by_qc_order(selected.qc_files)
 		if not ordered_plots:
 			st.info("No QC images found for selected session.")
 			return

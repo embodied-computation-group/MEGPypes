@@ -1,7 +1,7 @@
 from pathlib import Path
 from nipype import Workflow, Node, IdentityInterface, SelectFiles, DataSink
 from megpypes.interfaces.initpreproc import InitialPreproc
-from megpypes.utils import set_node_inputs
+from megpypes.pipelines.utils import set_node_inputs
 import logging
 logger = logging.getLogger(__name__)
 

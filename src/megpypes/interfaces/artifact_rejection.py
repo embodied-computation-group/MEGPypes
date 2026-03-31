@@ -1,3 +1,9 @@
+"""
+Artifact Rejection Interface
+Creates the NiPype interface for artifact rejection using optional Zapline denoising and ICA computation.
+
+"""
+
 from nipype.interfaces.base import (
     BaseInterface, BaseInterfaceInputSpec, TraitedSpec,
     File, traits, isdefined, OutputMultiPath
@@ -8,10 +14,12 @@ import logging
 import os
 from megpypes.proc_funcs.artifacts import apply_zapline_denoising
 from megpypes.proc_funcs.preprocessing import compute_ica
+from megpypes.interfaces.utils import abspath_with_time
 
 logger = logging.getLogger(__name__)
 
 class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
+    """Input Specification"""
     
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
 
@@ -33,15 +41,16 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
     ica_h_freq = traits.Float(30.0, usedefault=True)
     ica_method = traits.Enum("fastica","picard","infomax",usedefault=True)
 
-    out_file = traits.Str("artifact_cleaned_raw.fif", usedefault=True)
-    ica_file = traits.Str("ica-icasolution.fif", usedefault=True)
+    out_file = traits.Str("artifact-cleaned_raw.fif", usedefault=True)
+    ica_file = traits.Str("ica_icasolution.fif", usedefault=True)
 
     psd_before = traits.Str("psd_before_zapline.png", usedefault=True)
     psd_after = traits.Str("psd_after_zapline.png", usedefault=True)
-    ica_plot_path = traits.Str("ica_components.png", usedefault=True)
+    ica_plot_path = traits.Str("ica-components.png", usedefault=True)
 
 
 class ArtifactRejectionOutputSpec(TraitedSpec):
+    """Output Specification"""
     out_file = File(exists=True)
     ica_file = File(exists=True)
     psd_before = File(exists=True)
@@ -50,6 +59,33 @@ class ArtifactRejectionOutputSpec(TraitedSpec):
 
 
 class ArtifactRejection(BaseInterface):
+    """
+    NiPype interface for MEG artifact rejection with optional Zapline denoising and ICA computation.
+
+    Steps
+    -----
+        1. Compute and save PSD before denoising
+        2. (Optional) Apply Zapline denoising and save PSD after denoising
+        3. (Optional) Compute and save ICA decomposition with component plot
+        4. Save artifact-cleaned raw data
+
+    Returns
+    -------
+    out_file : File
+        Artifact-cleaned MEG file.
+
+    ica_file : File, optional
+        ICA decomposition file (when ICA computation is enabled).
+
+    psd_before : File
+        PSD plot before Zapline denoising.
+
+    psd_after : File, optional
+        PSD plot after Zapline denoising (when Zapline is enabled).
+
+    ica_plot : File, optional
+        ICA components plot (when ICA computation is enabled).
+    """
     input_spec = ArtifactRejectionInputSpec
     output_spec = ArtifactRejectionOutputSpec
 
@@ -65,6 +101,7 @@ class ArtifactRejection(BaseInterface):
         raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
 
         fig = raw.copy().compute_psd().plot(show=False)
+        self.inputs.psd_before = abspath_with_time(self.inputs.psd_before)
         psd_before_path = self._save_plot(fig, self.inputs.psd_before)
 
         if self.inputs.enable_zapline:
@@ -82,6 +119,7 @@ class ArtifactRejection(BaseInterface):
             )
 
             fig = raw.copy().compute_psd().plot(show=False)
+            self.inputs.psd_after = abspath_with_time(self.inputs.psd_after)
             psd_after_path = self._save_plot(fig, self.inputs.psd_after)
 
         if self.inputs.enable_compute_ica:
@@ -94,30 +132,32 @@ class ArtifactRejection(BaseInterface):
                 method=self.inputs.ica_method
             )
 
-            ica_path = os.path.abspath(self.inputs.ica_file)
-            ica_comps.save(ica_path, overwrite=True)
+            self.inputs.ica_file = abspath_with_time(self.inputs.ica_file)
+            ica_comps.save(self.inputs.ica_file, overwrite=True)
 
             fig = ica_comps.plot_components(show=False)
+            self.inputs.ica_plot_path = abspath_with_time(self.inputs.ica_plot_path)
             ica_plot_path = self._save_plot(fig, self.inputs.ica_plot_path)
 
-        out_path = os.path.abspath(self.inputs.out_file)
-        raw.save(out_path, overwrite=True)
+        self.inputs.out_file = abspath_with_time(self.inputs.out_file)
+        raw.save(self.inputs.out_file, overwrite=True)
 
         runtime.returncode = 0
         return runtime
 
     def _list_outputs(self):
+        """NiPype method to list outputs after interface execution"""
         outputs = self._outputs().get()
 
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
-        outputs["ica_file"] = os.path.abspath(self.inputs.ica_file)
-        outputs["psd_before"] = os.path.abspath(self.inputs.psd_before)
-        outputs["psd_after"] = os.path.abspath(self.inputs.psd_after)
-        outputs["ica_plot"] = os.path.abspath(self.inputs.ica_plot_path)
+        outputs["out_file"] = self.inputs.out_file
+        outputs["ica_file"] = self.inputs.ica_file
+        outputs["psd_before"] = self.inputs.psd_before
+        outputs["psd_after"] = self.inputs.psd_after
+        outputs["ica_plot"] = self.inputs.ica_plot_path
 
         return outputs
     
     def _save_plot(self, fig, filename):
-        path = os.path.abspath(filename)
+        path = filename
         fig.savefig(path)
         return path

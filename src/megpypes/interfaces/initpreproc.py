@@ -1,10 +1,9 @@
 """
-src/interfaces/preproc.py
-Creates the NiPype interface for initial raw preprocessing
+Initial Preprocessing Interface
+Creates the NiPype interface for initial raw preprocessing.
 
-Heavily inspired by the work in the ephypype package that wraps MNE functionality in NiPype.
+Interface structure inspired by the work in the ephypype package that wraps MNE functionality in NiPype.
 (ref: https://github.com/neuropycon/ephypype/blob/master/ephypype/preproc.py)
-
 
 """ 
 
@@ -17,10 +16,11 @@ from mne import find_events
 import logging
 import os
 from megpypes.proc_funcs.preprocessing import crop_to_events, gradient_compensation
-
+from megpypes.interfaces.utils import abspath_with_time
 logger = logging.getLogger(__name__)
 
 class InitialPreprocInputSpec(BaseInterfaceInputSpec):
+    """Input Specification"""
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
     
     # Enable steps on/off
@@ -42,15 +42,30 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     gradcomp_order = traits.Int(3, usedefault=True, desc="Manual gradient compensation order")
 
     # Output
-    out_file = traits.Str("initial_preproc_raw.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str("initial-preproc_raw.fif", usedefault=True, desc="Output filename")
 
 class InitialPreprocOutputSpec(TraitedSpec):
+    """Output Specification"""
     out_file = File(exists=True, desc="Preprocessed MEG file")
     events_file = File(exists=False, desc="Events TSV (optional)")
 
 
 class InitialPreproc(BaseInterface):
-    """Combined cropping + filtering + gradient compensation."""
+    """
+    NiPype interface for initial MEG preprocessing 
+
+    Steps
+    -----
+        1. Crop raw data around events with specified buffer
+        2. Apply bandpass filter
+        3. Apply gradient compensation
+
+    Returns
+    -------
+        out_file : File
+            Preprocessed MEG file
+
+    """
     input_spec = InitialPreprocInputSpec
     output_spec = InitialPreprocOutputSpec
     
@@ -90,20 +105,25 @@ class InitialPreproc(BaseInterface):
             
         # Save
         logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
-        out_path = os.path.abspath(self.inputs.out_file)
-        raw.save(out_path, overwrite=True)
-        logger.info(f"Saved: {out_path}")
+        self.inputs.out_file = abspath_with_time(self.inputs.out_file)
+        raw.save(self.inputs.out_file, overwrite=True)
+        logger.info(f"Saved: {self.inputs.out_file}")
         
         runtime.returncode = 0
         return runtime
     
     def _list_outputs(self):
+        """NiPype method to list outputs after interface execution"""
         outputs = self._outputs().get()
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["out_file"] = self.inputs.out_file
         return outputs
     
 def read_raw_auto(in_file_path):
-
+    """
+    Read raw MEG data from a file, automatically detecting the format.
+    
+    More uncommon formats (e.g., CTF .ds directories) are supported by checking the file extension and looking for parent directories.
+    """
     if in_file_path.endswith('.fif'):
         raw = mne.io.read_raw_fif(in_file_path, preload=True)
     elif in_file_path.endswith('.meg4'):
