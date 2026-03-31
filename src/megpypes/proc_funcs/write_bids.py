@@ -1,11 +1,12 @@
 def build_bids_container(bids_dir_name, input_wf_dir, datasink_output, subject: str, session: str | None = None, **extra_tags):
     """
     Dynamically constructs BIDS compliant directories and filename substitutions.
-    (Nipype Function nodes must be completely self-contained).
+    (NiPype Function nodes must be completely self-contained).
     """
     # check the existence of the 
     from pathlib import Path
     import os
+    import re
 
     if not isinstance(bids_dir_name, str):
         raise ValueError("bids_dir_name must be a string.")
@@ -92,6 +93,7 @@ def build_bids_container(bids_dir_name, input_wf_dir, datasink_output, subject: 
                 for key, value in extra_tags.items():
                     filename += f"_{key}-{value}"
             # add the original filename
+            
             filename += f"_desc-{file.name}"
         
             # create the full path for the BIDS file
@@ -100,6 +102,49 @@ def build_bids_container(bids_dir_name, input_wf_dir, datasink_output, subject: 
             # copy the file to the BIDS directory
             os.system(f"cp {file} {bids_file_path}")
             print(f"Copied {file} to {bids_file_path}")
-    
+
+    # Recurseively go through the BIDS directory and find folders with files
+    # then sort the files and rename the date string according to order 0,1,2
+    def normalize_bids_filenames(bids_root: Path):
+        """
+        Recursively walks through BIDS directory and replaces timestamp in filenames
+        with ordered integers per directory.
+        """
+
+        # regex to capture timestamp after desc-
+        pattern = re.compile(r"(desc-)(\d{8}T\d{6})(.*)")
+
+        # iterate through all subdirectories
+        for directory in [d for d in bids_root.rglob("*") if d.is_dir()]:
+            files = [f for f in directory.iterdir() if f.is_file()]
+
+            if not files:
+                continue
+
+            # filter only files that match expected pattern
+            matched_files = []
+            for f in files:
+                match = pattern.search(f.name)
+                if match:
+                    matched_files.append((f, match))
+
+            if not matched_files:
+                continue
+
+            # sort by timestamp string
+            matched_files.sort(key=lambda x: x[1].group(2))
+
+            # rename with index
+            for idx, (file_path, match) in enumerate(matched_files):
+                prefix, timestamp, suffix = match.groups()
+
+                new_name = pattern.sub(f"{prefix}{idx}{suffix}", file_path.name)
+                new_path = file_path.with_name(new_name)
+
+                print(f"Renaming {file_path.name} -> {new_name}")
+                file_path.rename(new_path)
+
+    normalize_bids_filenames(bids_output_dir)
 
     return bids_output_dir
+

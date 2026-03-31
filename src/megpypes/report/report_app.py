@@ -23,6 +23,7 @@ QC_PLOT_ORDER: list[dict[str, str]] = [
 		"file_hint": "desc-raw_epochs",
 		"title": "Raw Epochs",
 	},
+	{}
 ]
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".svg"}

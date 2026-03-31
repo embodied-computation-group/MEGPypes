@@ -17,7 +17,7 @@ from mne import find_events
 import logging
 import os
 from megpypes.proc_funcs.preprocessing import crop_to_events, gradient_compensation
-
+from megpypes.interfaces.utils import abspath_with_time
 logger = logging.getLogger(__name__)
 
 class InitialPreprocInputSpec(BaseInterfaceInputSpec):
@@ -42,7 +42,7 @@ class InitialPreprocInputSpec(BaseInterfaceInputSpec):
     gradcomp_order = traits.Int(3, usedefault=True, desc="Manual gradient compensation order")
 
     # Output
-    out_file = traits.Str("initial_preproc_raw.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str("initial-preproc_raw.fif", usedefault=True, desc="Output filename")
 
 class InitialPreprocOutputSpec(TraitedSpec):
     out_file = File(exists=True, desc="Preprocessed MEG file")
@@ -90,16 +90,16 @@ class InitialPreproc(BaseInterface):
             
         # Save
         logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
-        out_path = os.path.abspath(self.inputs.out_file)
-        raw.save(out_path, overwrite=True)
-        logger.info(f"Saved: {out_path}")
+        self.inputs.out_file = abspath_with_time(self.inputs.out_file)
+        raw.save(self.inputs.out_file, overwrite=True)
+        logger.info(f"Saved: {self.inputs.out_file}")
         
         runtime.returncode = 0
         return runtime
     
     def _list_outputs(self):
         outputs = self._outputs().get()
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["out_file"] = self.inputs.out_file
         return outputs
     
 def read_raw_auto(in_file_path):

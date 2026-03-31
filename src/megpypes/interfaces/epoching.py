@@ -10,6 +10,7 @@ from collections import Counter
 from autoreject import AutoReject
 from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, TraitedSpec, traits
 from megpypes.proc_funcs.epoch import handle_find_events
+from megpypes.interfaces.utils import abspath_with_time
 import logging
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     event_tmax = traits.Float(mandatory=True)
     
     # output
-    out_file = traits.Str(f"epoched-epo.fif", usedefault=True, desc="Output filename")
+    out_file = traits.Str(f"epoched_epo.fif", usedefault=True, desc="Output filename")
     plot_raw_epochs = traits.Str("raw_epochs.png", usedefault=True, desc="Filename for raw epochs plot")
     plot_ar_reject_log = traits.Str("ar_reject_log.png", usedefault=True, desc="Filename for autoreject reject log plot")
     plot_epochs_after_ar = traits.Str("ar_epochs.png", usedefault=True, desc="Filename for AR-cleaned epochs plot")
@@ -81,6 +82,7 @@ class Epoching(BaseInterface):
 
         # Save Raw epochs for QC
         fig = epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+        self.inputs.plot_raw_epochs = abspath_with_time(self.inputs.plot_raw_epochs)
         plot_path = self._save_plot(fig, self.inputs.plot_raw_epochs)
         logger.debug(f"Saved raw epochs plot: {plot_path}")
 
@@ -135,20 +137,19 @@ class Epoching(BaseInterface):
             final_epochs = epochs
 
         # Save epoched data
-        new_out_file_str = f"{self.inputs.event_label}_{self.inputs.out_file}"
+        new_out_file_str = f"{self.inputs.event_label}-{self.inputs.out_file}"
         # write this to input spec
-        self.inputs.out_file = new_out_file_str
-        out_path = Path(new_out_file_str).absolute()
-        logger.info(f"OUT FILE PATH: {out_path}")
-        final_epochs.save(out_path, overwrite=True)
-        logger.info(f"Saved: {out_path}")
+        self.inputs.out_file = abspath_with_time(new_out_file_str)
+        logger.info(f"OUT FILE PATH: {self.inputs.out_file}")
+        final_epochs.save(self.inputs.out_file, overwrite=True)
+        logger.info(f"Saved: {self.inputs.out_file}")
 
         runtime.returncode = 0
         return runtime
     
     def _list_outputs(self):
         outputs = self._outputs().get()
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["out_file"] = self.inputs.out_file
         outputs["plot_raw_epochs"] = os.path.abspath(self.inputs.plot_raw_epochs)
         outputs["plot_ar_reject_log"] = os.path.abspath(self.inputs.plot_ar_reject_log)
         outputs["plot_epochs_after_ar"] = os.path.abspath(self.inputs.plot_epochs_after_ar)

@@ -19,6 +19,7 @@ from nipype.interfaces.base import BaseInterface, BaseInterfaceInputSpec, Traite
 import logging
 
 from megpypes.proc_funcs.preprocessing import compute_ica
+from megpypes.interfaces.utils import abspath_with_time
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class AutoICAInputSpec(BaseInterfaceInputSpec):
 
     # Output
     out_file = traits.File(desc="Path to save the ICA-applied raw FIF file")
-    ica_file = traits.Str("auto_ica-icasolution.fif", usedefault=True, desc="ICA output filename")
+    ica_file = traits.Str("auto-ica_icasolution.fif", usedefault=True, desc="ICA output filename")
 
 class AutoICAOutputSpec(TraitedSpec):
     out_file = traits.File(exists=True, desc="ICA-applied raw FIF file")
@@ -97,9 +98,9 @@ class AutoICA(BaseInterface):
                 method=self.inputs.ica_method
             )
             # save ica
-            ica_path = os.path.abspath(self.inputs.ica_file)
-            ica_comps.save(ica_path, overwrite=True)
-            logger.info(f"Saved ICA: {ica_path}")
+            self.inputs.ica_file = abspath_with_time(self.inputs.ica_file)
+            ica_comps.save(self.inputs.ica_file, overwrite=True)
+            logger.info(f"Saved ICA: {self.inputs.ica_file}")
 
         # 2.Pick ICA exclusion indices Label ICA components ICA cleaning
         if self.inputs.ica_exclude:
@@ -132,14 +133,14 @@ class AutoICA(BaseInterface):
         raw_clean = ica.apply(raw, exclude=ica_exclude_idx)
 
         # Save ICA cleaned raw data
-        out_path = os.path.abspath(self.inputs.out_file)
-        raw_clean.save(out_path, overwrite=True)
-        logger.info(f"Saved ICA-applied raw file: {out_path}")
+        self.inputs.out_file = abspath_with_time(self.inputs.out_file)
+        raw_clean.save(self.inputs.out_file, overwrite=True)
+        logger.info(f"Saved ICA-applied raw file: {self.inputs.out_file}")
         runtime.returncode = 0
         return runtime
     
     def _list_outputs(self):
         outputs = self._outputs().get()
-        outputs["out_file"] = os.path.abspath(self.inputs.out_file)
+        outputs["out_file"] = self.inputs.out_file
         return outputs
     
