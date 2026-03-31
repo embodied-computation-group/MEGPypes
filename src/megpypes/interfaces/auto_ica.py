@@ -1,15 +1,7 @@
 """
-Automatic ICA-based artifact removal interface for MEG data using MNE-Python and ICLabel classification.
-
-The interface is mainly designed to remove biological artifacts such as eye blinks, muscle activity, and heartbeats from MEG recordings. 
-It is designed to be used after the initial preprocessing interface and power line artifact rejection steps like Zapline denoising.
-
-This interface:
-- computes ICA components from the raw filtered MEG
-- applies ICLabel classification to identify artifact components based on user-defined class labels and probability thresholds
-- applies ICA cleaning to remove identified artifact components from the raw data
-
-The user can also provide a pre-computed ICA decomposition and/or manually specify which ICA components indices to exclude instead of relying on automatic ICLabel classification.
+(WORK IN PROGRESS - Not usable yet)
+Automatic ICA Interface
+Creates the NiPype interface for ICA-based artifact rejection using optional ICLabel-guided component exclusion.
 
 """
 import os
@@ -25,6 +17,7 @@ from megpypes.interfaces.utils import abspath_with_time
 logger = logging.getLogger(__name__)
 
 class AutoICAInputSpec(BaseInterfaceInputSpec):
+    """Input Specification"""
     in_file = traits.File(exists=True, mandatory=True, desc="Path to the raw FIF file to process")
 
     # enable steps on/off
@@ -51,10 +44,29 @@ class AutoICAInputSpec(BaseInterfaceInputSpec):
     ica_file = traits.Str("auto-ica_icasolution.fif", usedefault=True, desc="ICA output filename")
 
 class AutoICAOutputSpec(TraitedSpec):
+    """Output Specification"""
     out_file = traits.File(exists=True, desc="ICA-applied raw FIF file")
     ica_file = traits.File(exists=True, desc="ICA decomposition used for cleaning")
 
 class AutoICA(BaseInterface):
+    """
+    NiPype interface for ICA-based artifact removal from MEG data.
+
+    Steps
+    -----
+        1. Load raw data and prepare it for ICA/ICLabel workflow
+        2. Compute or load ICA decomposition
+        3. Select components to exclude (manual list or ICLabel-based selection)
+        4. Apply ICA cleaning and save cleaned raw data
+
+    Returns
+    -------
+    out_file : File
+        ICA-cleaned MEG file.
+
+    ica_file : File
+        ICA decomposition used during cleaning.
+    """
     input_spec = AutoICAInputSpec
     output_spec = AutoICAOutputSpec
 
@@ -140,6 +152,7 @@ class AutoICA(BaseInterface):
         return runtime
     
     def _list_outputs(self):
+        """NiPype method to list outputs after interface execution"""
         outputs = self._outputs().get()
         outputs["out_file"] = self.inputs.out_file
         return outputs

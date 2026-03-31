@@ -1,3 +1,9 @@
+"""
+Artifact Rejection Interface
+Creates the NiPype interface for artifact rejection using optional Zapline denoising and ICA computation.
+
+"""
+
 from nipype.interfaces.base import (
     BaseInterface, BaseInterfaceInputSpec, TraitedSpec,
     File, traits, isdefined, OutputMultiPath
@@ -13,6 +19,7 @@ from megpypes.interfaces.utils import abspath_with_time
 logger = logging.getLogger(__name__)
 
 class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
+    """Input Specification"""
     
     in_file = File(exists=True, mandatory=True, desc="Input MEG file")
 
@@ -43,6 +50,7 @@ class ArtifactRejectionInputSpec(BaseInterfaceInputSpec):
 
 
 class ArtifactRejectionOutputSpec(TraitedSpec):
+    """Output Specification"""
     out_file = File(exists=True)
     ica_file = File(exists=True)
     psd_before = File(exists=True)
@@ -51,6 +59,33 @@ class ArtifactRejectionOutputSpec(TraitedSpec):
 
 
 class ArtifactRejection(BaseInterface):
+    """
+    NiPype interface for MEG artifact rejection with optional Zapline denoising and ICA computation.
+
+    Steps
+    -----
+        1. Compute and save PSD before denoising
+        2. (Optional) Apply Zapline denoising and save PSD after denoising
+        3. (Optional) Compute and save ICA decomposition with component plot
+        4. Save artifact-cleaned raw data
+
+    Returns
+    -------
+    out_file : File
+        Artifact-cleaned MEG file.
+
+    ica_file : File, optional
+        ICA decomposition file (when ICA computation is enabled).
+
+    psd_before : File
+        PSD plot before Zapline denoising.
+
+    psd_after : File, optional
+        PSD plot after Zapline denoising (when Zapline is enabled).
+
+    ica_plot : File, optional
+        ICA components plot (when ICA computation is enabled).
+    """
     input_spec = ArtifactRejectionInputSpec
     output_spec = ArtifactRejectionOutputSpec
 
@@ -111,6 +146,7 @@ class ArtifactRejection(BaseInterface):
         return runtime
 
     def _list_outputs(self):
+        """NiPype method to list outputs after interface execution"""
         outputs = self._outputs().get()
 
         outputs["out_file"] = self.inputs.out_file
