@@ -1,11 +1,7 @@
 from pathlib import Path
-import string
 
-from msgspec import field
-from parse import compile as parse_compile
 from nipype import JoinNode, Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
 from nipype.interfaces.utility import Function
-from megpypes.proc_funcs.runs import RunFinder
 from megpypes.interfaces.initpreproc import InitialPreproc
 from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
@@ -29,6 +25,29 @@ def create_meg_preprocessing(
     
     Parallelization: infosource.iterables creates one workflow execution per subject.
     No MapNode needed—iterables handles subject-level iteration.
+
+    Arguments
+    ----------
+    basedir: str
+        Base directory where raw data is located (used for SelectFiles).
+    workdir: str
+        Directory where the workflow will store intermediate results and outputs.
+    output_dir: str
+        Name of the output BIDS directory to create within the workflow's working directory.
+    file_templates: dict
+        Dictionary of file templates for SelectFiles (e.g., {"meg": "sub-{subject}/meg/sub-{subject}_meg.fif"}).
+    iterable_fields: list[str]
+        List of fields to iterate over (e.g., ["subject", "session"]).
+    iterable_values: dict[str, list[str]]
+        Dictionary mapping iterable fields to their values (e.g., {"subject": ["01", "02"], "session": ["01"]}).
+    pipeline_config: dict
+        Dictionary containing configuration for each interface. Keys should match interface names.
+        See the example config file for more info on expected config structure.
+    
+    Returns
+    -------
+    wf: Workflow
+        Configured Nipype workflow ready for execution.
     """
     # set basedir to full path based on working dir
     raw_dir = Path(basedir)

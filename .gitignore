@@ -13,3 +13,4 @@
 *.log
 # specific files
 notes.md
+src/megpypes/pipelines/initial_preproc.py

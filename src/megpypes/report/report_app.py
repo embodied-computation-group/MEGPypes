@@ -1,3 +1,9 @@
+"""
+QC visualisation app to investigate MEG preprocessing results.
+This app is designed to be launched from the MEGPypes runner after workflow execution, allowing users to easily navigate through QC plots generated during preprocessing. 
+It automatically discovers subjects and sessions based on the BIDS-like folder structure and displays associated QC images in an organized manner.
+The app also provides an option to export a comprehensive HTML report containing all QC plots for all subjects and sessions, which can be shared or archived for future reference.
+"""
 from __future__ import annotations
 
 import base64

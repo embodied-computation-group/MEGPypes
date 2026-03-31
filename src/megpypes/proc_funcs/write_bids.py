@@ -1,7 +1,24 @@
-def build_bids_container(bids_dir_name, input_wf_dir, datasink_output, subject: str, session: str | None = None, **extra_tags):
+def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str | None = None, **extra_tags):
     """
     Dynamically constructs BIDS compliant directories and filename substitutions.
     (NiPype Function nodes must be completely self-contained).
+
+    Arguments
+    ----------
+    bids_dir_name: str
+        Name of the output BIDS directory to create within the workflow's working directory.
+    input_wf_dir: Path
+        Path to the workflow's working directory where the BIDS directory will be created.
+    subject: str
+        Subject identifier to use in the BIDS directory structure and filenames (e.g., "01").
+    session: str | None
+        Optional session identifier to include in the BIDS directory structure and filenames (e.g., "01").
+
+    Returns
+    -------
+    bids_output_dir: Path
+        Path to the created BIDS directory containing the organized output files.
+
     """
     # check the existence of the 
     from pathlib import Path

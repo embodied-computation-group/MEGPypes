@@ -1,3 +1,18 @@
+"""
+High-level API for running the MEG preprocessing pipeline from code or notebooks.
+Implements the `MegPypesRunner` class.
+This module works as the main interaction point for users who want
+to run the MEG preprocessing pipeline using a (YAML) configuration file.
+
+This module defines the `MegPypesRunner` class, which provides methods to:
+- Load configuration from a YAML file or directly from a dictionary
+- Configure Nipype logging
+- Create the Nipype workflow based on the configuration¨
+- Run the workflow with specified plugin and number of workers
+- Optionally write the workflow graph to a file
+- Launch a Streamlit report app to visualize results
+- Stop the Streamlit report app when done
+"""
 from __future__ import annotations
 
 import os
@@ -25,7 +40,27 @@ class PipelineRunResult:
 
 
 class MegPypesRunner:
-    """High-level API for running the MEG preprocessing pipeline from code or notebooks."""
+    """
+    High-level API for running the MEG preprocessing pipeline from code or notebooks.
+    
+    Arguments
+    ---------
+    config: dict
+        Configuration dictionary containing 'paths', 'workflow', and 'pipeline_config' sections.
+    config_path: str | Path, optional
+        Path to the YAML configuration file (used for reference and logging, not required if config dict
+        is provided directly).
+    
+    Methods
+    -------
+    from_yaml(config_path): classmethod
+        Create a MegPypesRunner instance from a YAML configuration file.
+    configure_nipype_logging(...): Path
+        Set up Nipype logging configuration and return the logs directory path.
+    create_workflow(...): Any
+        Create the Nipype workflow based on the configuration.
+    
+    """
     
     def __init__(self, config: dict[str, Any], config_path: str | Path | None = None):
         self.config = config
@@ -60,6 +95,7 @@ class MegPypesRunner:
         workflow_level: str = "DEBUG",
         remove_unnecessary_outputs: bool = False,
     ) -> Path:
+        """Configure Nipype logging based on the provided parameters and return the logs directory path."""
         paths = self.paths_config
         logs_dir = Path(paths["workdir"]) / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +123,9 @@ class MegPypesRunner:
         paths_override: dict[str, Any] | None = None,
         pipeline_config_override: dict[str, Any] | None = None,
     ) -> Any:
+        """
+        Create the Nipype meg_preprocessing workflow based on the configuration. Allows for optional overrides of paths and pipeline config.
+        """
         paths = self.paths_config
         if paths_override:
             paths.update(paths_override)
@@ -153,6 +192,7 @@ class MegPypesRunner:
         paths_override: dict[str, Any] | None = None,
         pipeline_config_override: dict[str, Any] | None = None,
     ) -> PipelineRunResult:
+        """Run the workflow with the specified plugin and number of workers. Optionally write the workflow graph to a file."""
         self.configure_nipype_logging()
 
         wf = workflow or self.create_workflow(
@@ -189,6 +229,10 @@ class MegPypesRunner:
         app_path: str | Path | None = None,
         extra_args: list[str] | None = None,
     ) -> subprocess.Popen[str]:
+        """
+        Launch a Streamlit report app to visualize QC results and export a report. 
+        If an app is already running, it will be stopped first.
+        """
         if self._report_process is not None and self._report_process.poll() is None:
             self.stop_report_app()
 
@@ -297,6 +341,9 @@ class MegPypesRunner:
                 pass
 
     def stop_report_app(self, timeout: float = 3.0) -> None:
+        """
+        Stop the Streamlit report app if it is running, ensuring that any processes listening on the report port are terminated.
+        """
         process = self._report_process
 
         try:
