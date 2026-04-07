@@ -1,4 +1,5 @@
 import mne
+from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,17 @@ def _normalize_channel_list(stim_channel):
     if isinstance(stim_channel, str):
         return [stim_channel]
     return [ch for ch in stim_channel if ch]
+
+
+def _existing_channels(raw, channels):
+    """Return only channel names that exist in the raw object."""
+    existing = [ch for ch in channels if ch in raw.ch_names]
+    missing = [ch for ch in channels if ch not in raw.ch_names]
+
+    if missing:
+        logger.warning("Ignoring missing stim channels: %s", missing)
+
+    return existing
 
 
 def _candidate_stim_channels(raw):
@@ -57,6 +69,7 @@ def handle_find_events(raw, stim_channel=None, min_events=5):
     4) min_duration estimated from observed transitions
     """
     channels = _normalize_channel_list(stim_channel)
+    channels = _existing_channels(raw, channels)
     if not channels:
         channels = _candidate_stim_channels(raw)
 
@@ -114,3 +127,22 @@ def handle_find_events(raw, stim_channel=None, min_events=5):
     raise RuntimeError(
         f"Event detection failed for channels={channels}. Last failures: {failure_summary}"
     )
+
+
+def concatenate_epoch_files(epo_files, out_file="combined-epoched_epo.fif"):
+    """Concatenate multiple epochs FIF files into one epochs file."""
+    from pathlib import Path
+    import mne
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if not epo_files:
+        raise ValueError("No epoch files were provided for concatenation")
+
+    loaded = [mne.read_epochs(epo_path, preload=True) for epo_path in epo_files]
+    merged = mne.concatenate_epochs(loaded)
+
+    out_path = Path(out_file).absolute()
+    merged.save(str(out_path), overwrite=True)
+    logger.info("Saved merged epochs to %s", out_path)
+    return str(out_path)

@@ -14,15 +14,39 @@ def crop_to_events(
         min_buffer: float, 
         max_buffer: float
     ):
+    """Crop a raw recording to the first/last detected event plus time buffers."""
     logger.info(f"Cropping raw file to events.")
     logger.debug(f"Stim channel: {stim_channel}")
 
     # crop logic here
     events = find_events(raw, stim_channel=stim_channel, shortest_event=1)
-    tmin = raw.times[events[0][0]] + min_buffer
+
+    if events.size == 0:
+        logger.warning("No events found; skipping crop and returning input raw.")
+        return raw
+
+    # MNE events are in absolute sample numbers (including first_samp).
+    # Convert to local sample indices for this Raw object before indexing time.
+    first_samp = int(raw.first_samp)
+    first_event_idx = int(events[0, 0]) - first_samp
+    last_event_idx = int(events[-1, 0]) - first_samp
+
+    first_event_idx = int(np.clip(first_event_idx, 0, len(raw.times) - 1))
+    last_event_idx = int(np.clip(last_event_idx, 0, len(raw.times) - 1))
+
+    tmin = raw.times[first_event_idx] + min_buffer
     tmin = max(0.0, tmin)  # Ensure tmin >= 0
-    tmax = raw.times[events[-1][0]] + max_buffer
+    tmax = raw.times[last_event_idx] + max_buffer
     tmax = min(tmax, raw.times[-1])  # Ensure tmax <= data length
+
+    if tmax <= tmin:
+        logger.warning(
+            "Computed crop window is invalid (tmin=%s, tmax=%s); returning input raw.",
+            tmin,
+            tmax,
+        )
+        return raw
+
     cropped = raw.copy().crop(tmin=tmin, tmax=tmax)
     logger.debug(f"Cropped to [{tmin:.2f}, {tmax:.2f}] s")
     
@@ -31,6 +55,7 @@ def crop_to_events(
     return cropped
 
 def filter_data(in_file, l_freq, h_freq):
+    """Read a FIF file, apply band-pass filtering, and save a filtered copy."""
     import mne
     logger.info(f"Filtering file: {in_file}")
     logger.debug(f"Band-pass: {l_freq}-{h_freq} Hz")
@@ -47,6 +72,7 @@ def filter_data(in_file, l_freq, h_freq):
     return out_file
 
 def gradient_compensation(raw, auto=True, order=3):
+    """Apply MEG gradient compensation automatically or with a manual order."""
     logger.info(f"Applying gradient compensation")
 
     raw_copy = raw.copy()
@@ -77,6 +103,7 @@ def gradient_compensation(raw, auto=True, order=3):
     return raw_copy
     
 def set_channels(in_file, ch_dict: dict):
+    """Set channel types for a FIF file and write the updated raw file."""
     logger.info(f"Setting channel types for: {in_file}")
     logger.debug(f"Channel dict: {ch_dict}")
 
@@ -109,6 +136,7 @@ def compute_ica(
     filt_high: float = 30.0,
     method: str = "fastica",
 ):
+    """Fit ICA on filtered data and return the fitted ICA object."""
     raw_copy = raw.copy().load_data()
     raw_copy.filter(filt_low, filt_high)
 

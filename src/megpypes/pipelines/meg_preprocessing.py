@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from nipype import JoinNode, Workflow, Node, IdentityInterface, SelectFiles, DataSink, config
 from nipype.interfaces.utility import Function
@@ -7,6 +8,7 @@ from megpypes.interfaces.artifact_rejection import ArtifactRejection
 from megpypes.interfaces.auto_ica import AutoICA
 from megpypes.interfaces.epoching import Epoching
 from megpypes.pipelines.utils import apply_interface_config
+from megpypes.proc_funcs.epoch import concatenate_epoch_files
 from megpypes.proc_funcs.write_bids import build_bids_container
 import logging
 logger = logging.getLogger(__name__)
@@ -61,6 +63,21 @@ def create_meg_preprocessing(
     wf = Workflow(name=wf_name)
     wf.base_dir = workdir
 
+    # Ensure a subject axis is always available for BIDS naming.
+    iterable_fields = list(iterable_fields)
+    iterable_values = dict(iterable_values)
+    if "subject" not in iterable_fields:
+        logger.warning(
+            "No 'subject' iterable field was provided. Injecting synthetic subject axis with default value '01'."
+        )
+        iterable_fields.append("subject")
+    subject_values = iterable_values.get("subject")
+    if not subject_values:
+        logger.warning(
+            "No subject iterable values were provided. Using default subject ['01'] for BIDS output naming."
+        )
+        iterable_values["subject"] = ["01"]
+
     infosource = Node(
         IdentityInterface(fields=iterable_fields),
         name="infosource"
@@ -91,9 +108,15 @@ def create_meg_preprocessing(
         name="selectfiles"
     )
 
-    # connect the dynamic fields (subject->subject)
+    # Connect only fields that exist in SelectFiles templates.
+    template_fields = set()
+    template_values = file_templates.values() if isinstance(file_templates, dict) else [file_templates]
+    for template in template_values:
+        template_fields.update(re.findall(r"{([^{}]+)}", template))
+
     for field in iterable_fields:
-        wf.connect(infosource, field, selectraw, field)
+        if field in template_fields:
+            wf.connect(infosource, field, selectraw, field)
     
     # === PROCESSING NODE (regular Node, NOT MapNode) ===
     # iterables handles the iteration, so no iterfield needed
@@ -133,6 +156,8 @@ def create_meg_preprocessing(
     # === Epoching ====
     do_epoching = True
     if do_epoching:
+        combine_event_epochs = bool(pipeline_config["epoching"].get("combine_event_epochs", False))
+
         # Tranform dict into list iterables
         event_mapping = pipeline_config["epoching"]["iterables"]["event_mapping"]
         event_ids = []
@@ -158,12 +183,12 @@ def create_meg_preprocessing(
         epoching.synchronize = True
         apply_interface_config(epoching, pipeline_config["epoching"])
 
-        # collect the epochs
+        # Collect all per-event outputs so the datasink keeps one file per event.
         join_fields = ["epo_files", "plots_raw_epochs", "plots_ar_reject_log", "plots_epochs_after_ar"]
         collect_epochs = JoinNode(
             IdentityInterface(fields=join_fields),
             joinsource="epoching",   # join within each subject/session branch
-            joinfield="epo_files",     # field to aggregate into a list
+            joinfield=join_fields,
             name="collect_epochs",
         )
 
@@ -195,10 +220,28 @@ def create_meg_preprocessing(
             ]
         )
 
+        if combine_event_epochs:
+            merge_epochs = Node(
+                Function(
+                    input_names=["epo_files", "out_file"],
+                    output_names="merged_file",
+                    function=concatenate_epoch_files,
+                ),
+                name="merge_epochs",
+            )
+            merge_epochs.inputs.out_file = "combined-epoched_epo.fif"
+
+            wf.connect(
+                [
+                    (collect_epochs, merge_epochs, [("epo_files", "epo_files")]),
+                    (merge_epochs, datasink, [("merged_file", "meg.@final_epo_combined")]),
+                ]
+            )
+
     # Log workflow structure (after creation, not during)
 
     # === Build BIDS container ===
-    build_bids_inputs = ["bids_dir_name", "input_wf_dir", "datasink_output"] + iterable_fields
+    build_bids_inputs = ["bids_dir_path", "input_wf_dir", "datasink_output"] + iterable_fields
     print(f"Building BIDS container with inputs: {build_bids_inputs}")
     build_bids = Node(
         Function(
@@ -211,7 +254,7 @@ def create_meg_preprocessing(
     print(f"datasink outputs: {datasink.outputs}")
     wf.connect(datasink, "out_file", build_bids, "datasink_output") # pseudo-connect datasink to bids to structure DAG flow
 
-    build_bids.inputs.bids_dir_name = output_dir
+    build_bids.inputs.bids_dir_path = Path(output_dir).resolve()
     workflow_dir = Path(f"{wf.base_dir}/{wf_name}").absolute()
     print(f"workflow_dir: {workflow_dir}")
     build_bids.inputs.input_wf_dir = workflow_dir
