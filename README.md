@@ -5,7 +5,7 @@ User-friendly, automated electrophysiology preprocessing pipelines in Python.
 
 MEGPypes is a configuration-driven preprocessing package for MEG/EEG-style workflows, built largely on the NiPype neuroimaging workflow framework and centered on MNE for electrophysiological signal processing.
 
-The project is authored by Elisius Lyng Pedersen under the Embodied Computation Group, Aarhus University.
+The project is developed by Elisius Lyng Pedersen as part of the Embodied Computation Group at Aarhus University.
 
 ## Why MEGPypes
 
