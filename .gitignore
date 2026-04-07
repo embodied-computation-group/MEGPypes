@@ -9,6 +9,7 @@
 /datatest
 /notebooks
 /config
+/output
 # file patterns
 *.log
 # specific files

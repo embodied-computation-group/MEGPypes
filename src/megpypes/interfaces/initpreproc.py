@@ -125,7 +125,22 @@ def read_raw_auto(in_file_path):
     More uncommon formats (e.g., CTF .ds directories) are supported by checking the file extension and looking for parent directories.
     """
     if in_file_path.endswith('.fif'):
-        raw = mne.io.read_raw_fif(in_file_path, preload=True)
+        try:
+            raw = mne.io.read_raw_fif(in_file_path, preload=True)
+        except ValueError as exc:
+            msg = str(exc)
+            if "Split raw file detected" not in msg:
+                raise
+            logger.warning(
+                "Missing split FIF companions for %s. Falling back to "
+                "on_split_missing='ignore' to continue with available data only.",
+                in_file_path,
+            )
+            raw = mne.io.read_raw_fif(
+                in_file_path,
+                preload=True,
+                on_split_missing="ignore",
+            )
     elif in_file_path.endswith('.meg4'):
         # look up until .ds is found then input dir
         dir_path = os.path.dirname(in_file_path)
@@ -134,6 +149,8 @@ def read_raw_auto(in_file_path):
         if not dir_path:
             raise ValueError(f"Could not find .ds directory for file: {in_file_path}")
         raw = mne.io.read_raw_ctf(dir_path, preload=True)
+    elif in_file_path.endswith('.ds'):
+            raw = mne.io.read_raw_ctf(in_file_path, preload=True)
     else:
         # try to auto-detect based on file content
         raw = mne.io.read_raw(in_file_path, preload=True)

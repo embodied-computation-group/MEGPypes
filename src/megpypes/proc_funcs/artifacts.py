@@ -58,7 +58,7 @@ def apply_zapline_denoising(
         peak_power = mean_power[mask].max()
         median_power = np.median(mean_power[mask])
         if peak_power < 3 * median_power: # Threshold 3 is not empirically derived
-            logger.warning(f"No clear line frequency peak detected. Peak power: {peak:.2f}, Median power: {median_power:.2f}. Defaulting to fline={fline} Hz.")
+            logger.warning(f"No clear line frequency peak detected. Peak power: {peak_power:.2f}, Median power: {median_power:.2f}. Defaulting to fline={fline} Hz.")
             line_freq = None
         else:
             line_freq = freqs[mask][np.argmax(mean_power[mask])]

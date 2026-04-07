@@ -1,4 +1,11 @@
-def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str | None = None, **extra_tags):
+def build_bids_container(
+        bids_dir_path, 
+        input_wf_dir,
+        datasink_output, # placeholder for graph visualisation
+        subject: str, 
+        session: str | None = None, 
+        **extra_tags
+    ):
     """
     Dynamically constructs BIDS compliant directories and filename substitutions.
     (NiPype Function nodes must be completely self-contained).
@@ -25,8 +32,8 @@ def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str
     import os
     import re
 
-    if not isinstance(bids_dir_name, str):
-        raise ValueError("bids_dir_name must be a string.")
+    if not isinstance(bids_dir_path, Path):
+        raise ValueError("bids_dir_path must be a Path object.")
     if not isinstance(input_wf_dir, Path):
         raise ValueError("input_wf_dir must be a Path object.")
 
@@ -36,7 +43,7 @@ def build_bids_container(bids_dir_name, input_wf_dir, subject: str, session: str
     print(f"Building BIDS container with subject: {subject}, session: {session}, extra_tags: {extra_tags}")
 
     # first create output directory
-    bids_output_dir = input_wf_dir / bids_dir_name
+    bids_output_dir = bids_dir_path
     bids_output_dir.mkdir(parents=True, exist_ok=True)
 
     # find the correct folder based on iterables

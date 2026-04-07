@@ -1,19 +1,19 @@
 # Paths configuration
 paths:
-  basedir: "data/effort"  # Base directory for raw data
+  basedir: "data/MNE-spm-face"  # Base directory for raw data
   workdir: "workdir"        # Directory for intermediate files
   outputdir: "output"       # Directory for final outputs
   file_templates: 
-    meg: "*/{subject}_*_*_{session}.meg4"
-  iterable_fields: ["subject", "session"]  # Fields in the template to iterate over (e.g. subject, session)
+    meg: "MEG/*/*.ds/SPM_CTF_MEG_example_faces{session}_3D.meg4"
+  iterable_fields: ["session"]  # Fields in the template to iterate over (e.g. subject, session)
   iterable_values:
-    subject: ["0001"]  # List of subjects to process
-    session: ["01", "02"]  # List of sessions to process
+    subject: ["1"]  # List of subjects to process
+    session: ["1", "2"] # List of sessions to process (if applicable)
 
 # Workflow configuration
 workflow:
   plugin: Linear             # Plugin for parallel processing: Linear or MultiProc
-  n_workers: 8              # Number of workers for parallel processing
+  n_workers: 4              # Number of workers for parallel processing
   auto_workers: True        # Automatically set workers to max CPU cores - 2
 
 # Processing configuration
@@ -27,8 +27,8 @@ pipeline_config:
     args:
       crop:
         stim_channel:            # Channel to use for stimulus-based cropping
-        min_buffer: -0.2         # Minimum time buffer (seconds) before stimulus onset
-        max_buffer: 0.5          # Maximum time buffer (seconds) after stimulus offset
+        min_buffer: -1         # Minimum time buffer (seconds) before stimulus onset
+        max_buffer: 1          # Maximum time buffer (seconds) after stimulus offset
       filter:
         l_freq: 1.0              # Low-frequency cutoff (Hz)
         h_freq: 100             # High-frequency cutoff (Hz)
@@ -79,18 +79,18 @@ pipeline_config:
         ic_label_threshold: 0.7  # Probability threshold for excluding components based on ICLabel classification
   
   epoching:
+    combine_event_epochs: True  # If True, also writes one merged epochs file across event_mapping entries
     steps:
       epoch: True       # TODO: !NOT IMPLEMENTED!
       autoreject: False
     
     iterables:
       event_mapping: {
-        "19" : ["cue_onset", -1.0, 1.0],
-        "4" : ["force_start", -0.5, 5.0],
-        "8" : ["feedback_onset", -1.0, 1.5]
+        "1": ["faces", -0.2, 0.8],
+        "2": ["scrambled", -0.2, 0.8],
       }
 
     args:
       epoch:
-        stim_channels: ["UDIO001", "UADC009", "UADC010"]
+        stim_channels: ["UPPT001"]
       autoreject:

@@ -25,7 +25,12 @@ class EpochingInputSpec(BaseInterfaceInputSpec):
     autoreject = traits.Bool(True, desc="Flag to enable autoreject-based epoch rejection")
 
     # 1. Epoching based on events
-    stim_channels = traits.List(traits.Str())
+    stim_channels = traits.Either(
+        traits.List(traits.Str()),
+        None,
+        usedefault=True,
+        desc="Optional list of stimulus channels; falls back to automatic detection when omitted",
+    )
     event_id = traits.Int(mandatory=True)
     event_label = traits.Str(mandatory=True)
     event_tmin = traits.Float(mandatory=True)
@@ -82,7 +87,7 @@ class Epoching(BaseInterface):
         raw = mne.io.read_raw_fif(self.inputs.in_file, preload=True)
 
         # 1. Epoching based on events
-        events = handle_find_events(raw, stim_channel=self.inputs.stim_channels)
+        events = handle_find_events(raw, stim_channel=getattr(self.inputs, "stim_channels", None))
         logger.debug(f"events: {events}")
 
         mask = events[:, 2] == self.inputs.event_id
@@ -90,7 +95,7 @@ class Epoching(BaseInterface):
 
         if len(selected_events) == 0:
             raise RuntimeError(
-                f"No events found for trigger {self.inputs.event_code}"
+                f"No events found for trigger {self.inputs.event_label}"
             )
         
         epochs = mne.Epochs(
@@ -104,7 +109,9 @@ class Epoching(BaseInterface):
 
         # Save Raw epochs for QC
         fig = epochs.copy().plot_image(picks="mag", combine="mean", show=False)
-        self.inputs.plot_raw_epochs = abspath_with_time(self.inputs.plot_raw_epochs)
+        self.inputs.plot_raw_epochs = abspath_with_time(
+            f"{self.inputs.event_label}-{self.inputs.plot_raw_epochs}"
+        )
         plot_path = self._save_plot(fig, self.inputs.plot_raw_epochs)
         logger.debug(f"Saved raw epochs plot: {plot_path}")
 
@@ -146,11 +153,17 @@ class Epoching(BaseInterface):
             # TODO: Save the ar object for later QC of rejected epochs and channels
             # we can use the included ar.get_reject_log() function 
             ar_reject_log = ar.get_reject_log(epochs_meg, show=False).plot()
+            self.inputs.plot_ar_reject_log = abspath_with_time(
+                f"{self.inputs.event_label}-{self.inputs.plot_ar_reject_log}"
+            )
             ar_reject_log_path = self._save_plot(ar_reject_log, self.inputs.plot_ar_reject_log)
             logger.debug(f"Saved AR reject log plot: {ar_reject_log_path}")
 
             # save AR-cleaned epochs
             fig = ar_epochs.copy().plot_image(picks="mag", combine="mean", show=False)
+            self.inputs.plot_epochs_after_ar = abspath_with_time(
+                f"{self.inputs.event_label}-{self.inputs.plot_epochs_after_ar}"
+            )
             ar_epochs_plot_path = self._save_plot(fig, self.inputs.plot_epochs_after_ar)
             logger.debug(f"Saved AR-cleaned epochs plot: {ar_epochs_plot_path}")
 
