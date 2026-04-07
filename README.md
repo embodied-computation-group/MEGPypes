@@ -5,7 +5,7 @@ User-friendly, automated electrophysiology preprocessing pipelines in Python.
 
 MEGPypes is a configuration-driven preprocessing package for MEG/EEG-style workflows, built largely on the NiPype neuroimaging workflow framework and centered on MNE for electrophysiological signal processing.
 
-The project is authored by Peli under the Embodied Computation Group, Aarhus University.
+The project is authored by Elisius Lyng Pedersen under the Embodied Computation Group, Aarhus University.
 
 ## Why MEGPypes
 
@@ -31,7 +31,7 @@ The current preprocessing flow is assembled in a NiPype workflow and includes:
 - Optional Zapline denoising
 - Optional ICA decomposition and diagnostic plots
 
-3. Automatic ICA cleaning
+3. Automatic ICA cleaning (Work In Progress)
 - Optional ICLabel-based component exclusion
 - Artifact-aware ICA application to raw data
 
@@ -43,7 +43,7 @@ In practice, these stages are represented by configurable interfaces (`initial_p
 
 ## Configuration-First Design
 
-MEGPypes is driven by a single YAML configuration file (see `demos/config_effort.yaml`) with three top-level sections:
+MEGPypes is driven by a single YAML configuration file (see `demos/config_example.yaml`) with three top-level sections:
 
 - `paths`: data locations, file templates, iterable dimensions (e.g., subject/session).
 - `workflow`: execution backend and worker strategy.
@@ -67,7 +67,7 @@ pipeline_config:
 				ica_random_state: 821
 ```
 
-This enables one config file to define both processing behavior and execution logic for full cohorts.
+This enables one config file to define both processing behavior and execution logic for all runs.
 
 ## Quickstart
 
@@ -76,7 +76,25 @@ This enables one config file to define both processing behavior and execution lo
 From the project root:
 
 ```bash
-pip install -e .
+uv sync
+```
+
+Install the project itself in editable mode (recommended during development):
+
+```bash
+uv pip install -e .
+```
+
+Install the project as a regular package from local source (non-editable):
+
+```bash
+uv pip install .
+```
+
+Install directly from a Git source (no fork required if you have access):
+
+```bash
+uv pip install "git+ssh://git@github.com/embodied-computation-group/MEGPypes.git"
 ```
 
 ### Run from Python
@@ -85,7 +103,7 @@ pip install -e .
 from pathlib import Path
 from megpypes.runner import MegPypesRunner
 
-config_path = Path("demos/config_effort.yaml")
+config_path = Path("demos/config_example.yaml")
 runner = MegPypesRunner.from_yaml(config_path)
 
 # Build workflow
@@ -122,7 +140,7 @@ runner.stop_report_app()
 
 ## Citations
 
-If you use MEGPypes, please cite the core workflow and signal-processing frameworks:
+MEGPypes, is built on these core workflow and signal-processing frameworks:
 
 1. Gorgolewski K, Burns CD, Madison C, Clark D, Halchenko YO, Waskom ML, Ghosh SS. (2011). Nipype: a flexible, lightweight and extensible neuroimaging data processing framework in Python. Front. Neuroinform. 5:13.
 2. Alexandre Gramfort, Martin Luessi, Eric Larson, Denis A. Engemann, Daniel Strohmeier, Christian Brodbeck, Roman Goj, Mainak Jas, Teon Brooks, Lauri Parkkonen, and Matti S. Hamalainen. MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7(267):1-13, 2013. doi:10.3389/fnins.2013.00267.
